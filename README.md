@@ -1,1 +1,1 @@
-# Face-Detector-1MB-with-landmark
+# torch-Slim-Detection-Landmark
