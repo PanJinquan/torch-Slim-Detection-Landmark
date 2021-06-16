@@ -1,0 +1,17 @@
+INFO: Namespace(check=False, data_type='voc', gamma=0.1, lr=0.001, momentum=0.9, network='RFB', num_workers=4, resume_epoch=0, resume_net=None, save_folder='./weights/', train_path=['/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/trainval.txt'], val_path=['/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/test.txt'], weight_decay=0.0005)
+INFO: save_folder:./weights/
+INFO: =============================================
+INFO: Loading train Data:/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/trainval.txt
+INFO: read filename   from :/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/trainval.txt
+INFO: read label_file from :/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/classes.txt
+INFO: VOC Labels read from file: /home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/classes.txt
+INFO: class_dict: {'BACKGROUND': 0, 'face': 1}
+INFO: have train data: 11920
+INFO: ------------------------------
+INFO: Loading val Data:/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/test.txt
+INFO: read filename   from :/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/test.txt
+INFO: read label_file from :/home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/classes.txt
+INFO: VOC Labels read from file: /home/dm/data3/dataset/face_person/wider_face_add_lm_10_10/classes.txt
+INFO: class_dict: {'BACKGROUND': 0, 'face': 1}
+INFO: have val data: 939
+INFO: =============================================
