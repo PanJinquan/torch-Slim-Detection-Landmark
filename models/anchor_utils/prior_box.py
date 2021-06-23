@@ -32,7 +32,7 @@ class PriorBox(object):
         self.aspect_ratios = cfg["aspect_ratios"]
         self.shrinkage = cfg["shrinkage"]
         self.input_size = input_size
-        self.min_boxes = cfg['min_sizes']
+        self.min_sizes = cfg['min_sizes']
         self.shrinkage = cfg['shrinkage']
         self.clip = cfg['clip']
         self.prior_cfg = cfg
@@ -62,7 +62,7 @@ class PriorBox(object):
                              self.shrinkage]
         anchors = []
         for k, f in enumerate(self.feature_maps):
-            min_sizes = self.min_boxes[k]
+            min_sizes = self.min_sizes[k]
             for i, j in product(range(f[0]), range(f[1])):
                 for min_size in min_sizes:
                     s_kx = min_size / self.input_size[1]
@@ -110,7 +110,7 @@ class PriorBox(object):
         priors = self.generate_priors(feature_map_w_h_list,
                                       shrinkage_list,
                                       self.input_size,
-                                      min_boxes=self.min_boxes,
+                                      min_boxes=self.min_sizes,
                                       aspect_ratios=self.aspect_ratios)
         # anchors_t = np.asarray(priors).reshape(-1, 4)
         print("priors nums:{},priors_type:{}".format(len(priors), self.priors_type))

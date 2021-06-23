@@ -1,21 +1,10 @@
 import os
-import sys
 import argparse
-import torch
-import torch.optim as optim
 import torch.utils.data as data
 import train
-from models.dataloader.parser_voc_landmark import VOCLandmarkDataset
-from models.dataloader.parser_voc import VOCDataset
-# from models.dataloader.parser_voc_landmark_preproc import VOCLandmarkDataset
 from models.transforms.data_transforms import TrainLandmsTransform, TestLandmsTransform
-from models.dataloader import WiderFaceDetection, detection_collate, preproc, val_preproc
-from models.backbone.layers import MultiBoxLandmLoss
-from models.backbone.layers.functions.prior_box import PriorBox
-from models import nets
-from utils import file_processing, debug, torch_tools
-from tensorboardX import SummaryWriter
-from torch.optim.lr_scheduler import CosineAnnealingLR, MultiStepLR
+from models.dataloader import detection_collate
+from models.backbone.multibox_loss import MultiBoxLandmLoss
 
 
 def get_parser():

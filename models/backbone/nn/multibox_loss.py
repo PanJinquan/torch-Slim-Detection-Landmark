@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..utils import box_utils
+from models.anchor_utils import box_utils
 
 
 class MultiboxLoss(nn.Module):

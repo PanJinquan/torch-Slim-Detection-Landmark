@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import random
-from models.backbone.utils.box_code_utils import matrix_iof
+from models.anchor_utils.anchor_utils import matrix_iof
 
 
 def _crop(image, boxes, labels, landm, img_dim, test=False):

@@ -19,12 +19,10 @@ import torch
 import cv2
 import numpy as np
 from models import nets
-from models.backbone.layers.functions.prior_box import PriorBox
-from models.backbone.utils import box_code_utils
-from utils.nms.py_cpu_nms import py_cpu_nms
+from models.anchor_utils.prior_box import PriorBox
+from models.anchor_utils import anchor_utils
+from models.anchor_utils.nms.py_cpu_nms import py_cpu_nms
 from utils import image_processing, file_processing, torch_tools
-
-print(torch.cuda.device_count())
 
 
 def get_parser():
@@ -91,7 +89,7 @@ class Detector(object):
         self.net = self.load_model(self.net, model_path)
         print('Finished loading model!')
 
-    def build_net(self, net_type, priors_type, version="v1"):
+    def build_net(self, net_type, priors_type, version="v2"):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type, freeze_header=self.freeze_header)
         if version.lower() == "v1".lower():
             net = nets.build_net_v1(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
@@ -146,8 +144,8 @@ class Detector(object):
         bboxes_scale = np.asarray(image_size * 2)
         # get boxes
         if not self.prior_boxes.freeze_header:
-            boxes = box_code_utils.decode(boxes.data.squeeze(0), self.priors,
-                                          [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
+            boxes = anchor_utils.decode(boxes.data.squeeze(0), self.priors,
+                                        [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
         boxes = boxes.cpu().numpy()
         conf = conf.squeeze(0).data.cpu().numpy()
         boxes = boxes * bboxes_scale

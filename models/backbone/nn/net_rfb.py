@@ -1,10 +1,7 @@
 import torch
 import torch.nn as nn
-import torchvision.models.detection.backbone_utils as backbone_utils
-import torchvision.models._utils as _utils
 import torch.nn.functional as F
-from collections import OrderedDict
-from ..utils import box_code_utils
+from models.anchor_utils import anchor_utils
 
 
 class BasicConv(nn.Module):
@@ -209,12 +206,12 @@ class RFBLandm(nn.Module):
             output = (bbox_regressions, classifications, ldm_regressions)
         else:
             if self.freeze_header:
-                bbox_regressions = box_code_utils.decode(bbox_regressions.data.squeeze(0),
-                                                         self.priors.to(bbox_regressions.device),
-                                                         [self.center_variance, self.size_variance])
-                ldm_regressions = box_code_utils.decode_landm(ldm_regressions.data.squeeze(0),
-                                                              self.priors.to(bbox_regressions.device),
-                                                              [self.center_variance, self.size_variance])
+                bbox_regressions = anchor_utils.decode(bbox_regressions.data.squeeze(0),
+                                                       self.priors.to(bbox_regressions.device),
+                                                       [self.center_variance, self.size_variance])
+                ldm_regressions = anchor_utils.decode_landm(ldm_regressions.data.squeeze(0),
+                                                            self.priors.to(bbox_regressions.device),
+                                                            [self.center_variance, self.size_variance])
             output = (bbox_regressions, F.softmax(classifications, dim=-1), ldm_regressions)
         return output
 
@@ -332,8 +329,8 @@ class RFB(nn.Module):
             output = (bbox_regressions, classifications)
         else:
             if self.freeze_header:
-                bbox_regressions = box_code_utils.decode(bbox_regressions.data.squeeze(0),
-                                                         self.priors.to(bbox_regressions.device),
-                                                         [self.center_variance, self.size_variance])
+                bbox_regressions = anchor_utils.decode(bbox_regressions.data.squeeze(0),
+                                                       self.priors.to(bbox_regressions.device),
+                                                       [self.center_variance, self.size_variance])
             output = (bbox_regressions, F.softmax(classifications, dim=-1))
         return output

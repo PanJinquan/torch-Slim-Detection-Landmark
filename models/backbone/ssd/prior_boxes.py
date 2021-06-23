@@ -50,7 +50,7 @@ class PriorBoxes():
         self.iou_threshold = cfg["iou_threshold"]
         self.center_variance = cfg["center_variance"]
         self.size_variance = cfg["size_variance"]
-        self.min_boxes = cfg["min_boxes"]
+        self.min_boxes = cfg["min_sizes"]
         self.aspect_ratios = cfg["aspect_ratios"]
         self.shrinkage = cfg["shrinkage"]
         self.input_size = input_size

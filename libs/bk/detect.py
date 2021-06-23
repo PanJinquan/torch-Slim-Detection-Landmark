@@ -5,13 +5,13 @@ import torch.backends.cudnn as cudnn
 import numpy as np
 import time
 from models.backbone.layers.functions import PriorBox
-from utils.nms.py_cpu_nms import py_cpu_nms
+from models.anchor_utils.nms import py_cpu_nms
 import cv2
 from models.dataloader import cfg_mnet, cfg_slim, cfg_rfb
 from models.backbone.retinaface import RetinaFaceLandm
 from models.backbone.nn.net_slim import SlimLandm
 from models.backbone.nn.net_rfb import RFBLandm
-from models.backbone.utils.box_code_utils import decode, decode_landm
+from models.anchor_utils import decode, decode_landm
 
 parser = argparse.ArgumentParser(description='Test')
 parser.add_argument('-m', '--trained_model', default='./weights/RBF_Final.pth',

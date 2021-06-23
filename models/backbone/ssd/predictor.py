@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import torch
-from ..utils import box_utils
+from models.anchor_utils import box_utils
 
 
 class Predictor(object):

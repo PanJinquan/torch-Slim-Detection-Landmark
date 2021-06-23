@@ -34,7 +34,7 @@ def create_mb_tiny_slim_fd(prior_boxes, num_classes, is_test=False, width_mult=1
             ReLU()
         )
     ])
-    boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_boxes]
+    boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_sizes]
 
     regression_headers = ModuleList([
         SeperableConv2d(in_channels=base_net.base_channel * 4,

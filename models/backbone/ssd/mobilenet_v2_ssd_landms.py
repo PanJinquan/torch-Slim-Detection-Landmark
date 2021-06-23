@@ -47,7 +47,7 @@ def create_mobilenetv2_ssd_landms(prior_boxes, num_classes, is_test=False, width
         )
     ])
 
-    boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_boxes]
+    boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_sizes]
     regression_headers = ModuleList([
         SeperableConv2d(in_channels=channels[0],
                         out_channels=boxes_expand[0] * 4,

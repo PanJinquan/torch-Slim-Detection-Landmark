@@ -9,8 +9,8 @@ from models.dataloader.parser_voc import VOCDataset
 # from models.dataloader.parser_voc_landmark_preproc import VOCLandmarkDataset
 from models.transforms.data_transforms import TrainTransform
 from models.dataloader import WiderFaceDetection, detection_collate
-from models.backbone.layers import MultiBoxLoss
-from models.backbone.layers.functions.prior_box import PriorBox
+from models.backbone.multibox_loss import MultiBoxLoss
+from models.anchor_utils.prior_box import PriorBox
 from models import nets
 from utils import file_processing, debug, torch_tools
 from tensorboardX import SummaryWriter

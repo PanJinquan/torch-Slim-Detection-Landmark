@@ -24,7 +24,7 @@ def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=
 def create_mb_tiny_rfb_landms(prior_boxes, num_classes, is_test=False, width_mult=1.0, device="cuda:0"):
     """
     create_Mb_Tiny_RFB_fd_predictor
-    min_boxes = [[10, 16, 24], [32, 48], [64, 96], [128, 192, 256]]  # for Face
+    min_sizes = [[10, 16, 24], [32, 48], [64, 96], [128, 192, 256]]  # for Face
     x=torch.Size([24, 64, 30, 40]), location:torch.Size([24, 12, 30, 40])location-view:torch.Size([24, 3600, 4])
     x=torch.Size([24, 128, 15, 20]),location:torch.Size([24, 8, 15, 20]) location-view:torch.Size([24, 600, 4])
     x=torch.Size([24, 256, 8, 10]), location:torch.Size([24, 8, 8, 10])  location-view:torch.Size([24, 160, 4])
@@ -48,7 +48,7 @@ def create_mb_tiny_rfb_landms(prior_boxes, num_classes, is_test=False, width_mul
         )
     ])
 
-    boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_boxes]
+    boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_sizes]
     regression_headers = ModuleList([
         SeperableConv2d(in_channels=base_net.base_channel * 4,
                         out_channels=boxes_expand[0] * 4,

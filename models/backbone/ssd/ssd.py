@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # from models.backbone.utils import box_utils
-from models.backbone.utils import box_code_utils
+from models.anchor_utils import anchor_utils
 
 GraphPath = namedtuple("GraphPath", ['s0', 'name', 's1'])
 
@@ -105,8 +105,8 @@ class SSD(nn.Module):
                 #                                                  self.center_variance,
                 #                                                  self.size_variance)
                 # locations = box_utils.center_form_to_corner_form(locations)
-                locations = box_code_utils.decode(locations.data.squeeze(0), self.priors,
-                                                  [self.center_variance, self.size_variance])
+                locations = anchor_utils.decode(locations.data.squeeze(0), self.priors,
+                                                [self.center_variance, self.size_variance])
             return locations, confidences
         else:
             return locations, confidences
@@ -166,7 +166,7 @@ class SSD(nn.Module):
 class MatchPrior(object):
     def __init__(self, center_form_priors, center_variance, size_variance, iou_threshold):
         self.center_form_priors = center_form_priors
-        self.corner_form_priors = box_code_utils.center_form_to_corner_form(center_form_priors)
+        self.corner_form_priors = anchor_utils.center_form_to_corner_form(center_form_priors)
         self.center_variance = center_variance
         self.size_variance = size_variance
         self.iou_threshold = iou_threshold
@@ -176,11 +176,11 @@ class MatchPrior(object):
             gt_boxes = torch.from_numpy(gt_boxes)
         if type(gt_labels) is np.ndarray:
             gt_labels = torch.from_numpy(gt_labels)
-        boxes, labels = box_code_utils.assign_priors(gt_boxes, gt_labels,
-                                                     self.corner_form_priors, self.iou_threshold)
-        boxes = box_code_utils.corner_form_to_center_form(boxes)
-        locations = box_code_utils.convert_boxes_to_locations(boxes, self.center_form_priors, self.center_variance,
-                                                              self.size_variance)
+        boxes, labels = anchor_utils.assign_priors(gt_boxes, gt_labels,
+                                                   self.corner_form_priors, self.iou_threshold)
+        boxes = anchor_utils.corner_form_to_center_form(boxes)
+        locations = anchor_utils.convert_boxes_to_locations(boxes, self.center_form_priors, self.center_variance,
+                                                            self.size_variance)
         return locations, labels
 
 
