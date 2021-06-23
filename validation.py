@@ -154,7 +154,7 @@ class Validation(demo.Detector):
         if os.path.exists(dt_label_dir):
             file_processing.remove_dir(dt_label_dir)
         file_processing.create_dir(dt_label_dir)
-        gt_label_list = file_processing.get_files_list(gt_label_dir, postfix=["*.txt"])
+        gt_label_list = file_processing.get_files_lists(gt_label_dir, postfix=["*.txt"])
         for file_path in gt_label_list:
             filename = os.path.basename(file_path)
             image_path = os.path.join(image_dir, filename[:-len("txt")] + "jpg")
@@ -380,7 +380,7 @@ def validation_report():
     '''
     prob_threshold = 0.05
     iou_threshold = 0.5
-    model_path = "/home/dm/data3/FaceDetector/Face-Detector-1MB-with-landmark/work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v2_20210615210557/model/best_model_RFB_150_loss2.8792.pth"
+    model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v3_20210616195058/model/best_model_RFB_157_loss2.8114.pth"
     # priors_type = "face"
     priors_type = "face_person"
     net_type = "RFB"

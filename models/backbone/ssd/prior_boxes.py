@@ -1,43 +1,61 @@
-import torch
-from itertools import product as product
 import numpy as np
-from math import ceil
-from models.config import config
 import math
+import torch
+from models.config import config
 
 
-class PriorBox(object):
-    def __init__(self, input_size: list, priors_type="face", freeze_header=False):
-        super(PriorBox, self).__init__()
+class PriorBoxes():
+    def __init__(self, input_size: list, priors_type="face", freeze_header=True):
+        """
+        input_size=[W,H]
+        input_size={ 128: [128, 96],
+                     160: [160, 120],
+                     320: [320, 240],
+                     480: [480, 360],
+                     # 640: [640, 480],
+                     640: [640, 360],
+                     960: [960, 540],
+                     1280: [1280, 960]}
+                     [1280 720]-->[640,360]
+        :param input_size:
+        :param priors_type: face or person
+        """
         self.priors_type = priors_type
         if priors_type == "face":
             cfg = config.face_config
+        elif priors_type == "person":
+            cfg = config.person_config
         elif priors_type == "face_person":
             cfg = config.face_person_config
-        elif priors_type == "rfb_face":
-            cfg = config.rfb_face_config
-        elif priors_type == "mnet_face":
-            cfg = config.mnet_face_config
-        elif priors_type == "slim_face":
-            cfg = config.slim_face_config
+        elif priors_type == "face_person_lie":
+            cfg = config.face_person_lie_config
+        elif priors_type == "face_body":
+            cfg = config.face_body_config
+        elif priors_type == "person_pig":
+            cfg = config.person_pig_config
+        elif priors_type == "fingernail":
+            cfg = config.fingernail_config
+        elif priors_type == "card":
+            cfg = config.card_config
+        elif priors_type == "custom":
+            cfg = config.custom_config
+        # elif priors_type == "mbv2_person":
+        #     cfg = config.mbv2_person_config
         else:
             raise Exception("Error:{}".format(priors_type))
-
+        self.prior_cfg = cfg
         self.class_names = cfg["class_names"]
         self.image_mean = cfg["image_mean"]
         self.image_std = cfg["image_std"]
         self.iou_threshold = cfg["iou_threshold"]
         self.center_variance = cfg["center_variance"]
         self.size_variance = cfg["size_variance"]
+        self.min_boxes = cfg["min_boxes"]
         self.aspect_ratios = cfg["aspect_ratios"]
         self.shrinkage = cfg["shrinkage"]
         self.input_size = input_size
-        self.min_boxes = cfg['min_sizes']
-        self.shrinkage = cfg['shrinkage']
-        self.clip = cfg['clip']
-        self.prior_cfg = cfg
-        # self.priors = self.get_priors()
-        self.priors = self.get_priors_v2()
+
+        self.priors = self.get_priors()
         self.freeze_header = freeze_header
         self.num_classes = self.get_numclass()
 
@@ -57,28 +75,7 @@ class PriorBox(object):
     def get_prior_cfg(self):
         return self.prior_cfg
 
-    def get_priors(self):
-        self.feature_maps = [[ceil(self.input_size[0] / step), ceil(self.input_size[1] / step)] for step in
-                             self.shrinkage]
-        anchors = []
-        for k, f in enumerate(self.feature_maps):
-            min_sizes = self.min_boxes[k]
-            for i, j in product(range(f[0]), range(f[1])):
-                for min_size in min_sizes:
-                    s_kx = min_size / self.input_size[1]
-                    s_ky = min_size / self.input_size[0]
-                    dense_cx = [x * self.shrinkage[k] / self.input_size[1] for x in [j + 0.5]]
-                    dense_cy = [y * self.shrinkage[k] / self.input_size[0] for y in [i + 0.5]]
-                    for cy, cx in product(dense_cy, dense_cx):
-                        anchors += [cx, cy, s_kx, s_ky]
-
-        # back to torch land
-        output = torch.Tensor(anchors).view(-1, 4)
-        if self.clip:
-            output.clamp_(max=1, min=0)
-        return output
-
-    def get_priors_v2(self, ):
+    def get_priors(self, ):
         """
         input_size = [width,height]
         16：9:
@@ -162,7 +159,7 @@ if __name__ == "__main__":
     # 17625,29375
     input_size = [320, 320]  # W,H
     priors_type = "face_person"
-    prior_boxes = PriorBox(input_size, priors_type=priors_type)
+    prior_boxes = PriorBoxes(input_size, priors_type=priors_type)
     image = np.ones(shape=(input_size[1], input_size[0], 3), dtype=np.uint8)
     anchors = prior_boxes.priors.detach().numpy()
     anchors = image_processing.center2bboxes(anchors)

@@ -30,7 +30,8 @@ print(torch.cuda.device_count())
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v2_20210615210557/model/best_model_RFB_150_loss2.8792.pth"
+    # model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v2_20210615210557/model/best_model_RFB_150_loss2.8792.pth"
+    model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v4_20210622194254/model/best_model_RFB_176_loss2.7943.pth"
     # model_path ="work_space/rfb_ldmks_face_320_320.pth"
     net_type = "rfb"
     priors_type = "face_person"
@@ -38,7 +39,7 @@ def get_parser():
     parser.add_argument('-m', '--model_path', default=model_path, type=str, help='model file path')
     parser.add_argument('--net_type', default=net_type, help='Backbone network mobile0.25 or slim or RFB')
     parser.add_argument('--priors_type', default=priors_type, help='Backbone network mobile0.25 or slim or RFB')
-    parser.add_argument('--prob_threshold', default=0.3, type=float, help='confidence_threshold')
+    parser.add_argument('--prob_threshold', default=0.5, type=float, help='confidence_threshold')
     parser.add_argument('--iou_threshold', default=0.3, type=float, help='iou_threshold')
     parser.add_argument('--image_dir', default=image_dir, type=str, help='directory or image path')
     parser.add_argument('--input_size', nargs='+', help="--input size [600(W),600(H)]", type=int, default=input_size)
@@ -89,7 +90,8 @@ class Detector(object):
 
     def build_net(self, net_type, priors_type):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type)
-        net = nets.build_net(net_type, priorbox.prior_cfg, width_mult=1.0, phase='test')
+        # net = nets.build_net(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
         net = net.to(self.device)
         return net, priorbox
 

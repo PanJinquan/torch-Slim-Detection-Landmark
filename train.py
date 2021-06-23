@@ -26,7 +26,8 @@ def get_parser():
     # train_path = '/home/dm/panjinquan3/widerface/train/train.txt'
     # val_path = '/home/dm/panjinquan3/widerface/train/val.txt'
     # data_type = "WiderFace"
-    net_type = "rfb"
+    # net_type = "rfb"
+    net_type = "RFB"
 
     # train_path1 = "/home/dm/panjinquan3/MPII/trainval.txt"
     # val_path = "/home/dm/panjinquan3/MPII/test.txt"
@@ -35,9 +36,8 @@ def get_parser():
     train_path = "/home/dm/data3/dataset/face_person/MPII/test.txt"
     val_path = "/home/dm/data3/dataset/face_person/MPII/test.txt"
     data_type = "VOC"
-    priors_type="face_person"
-    num_workers = 4
-    batch_size = 64
+    priors_type = "face_person"
+    batch_size = 8
     train_path = [train_path]
     val_path = [val_path]
     parser.add_argument('--train_path', nargs='+', help='Dataset directory path', default=train_path)
@@ -46,7 +46,7 @@ def get_parser():
     parser.add_argument('--data_type', default=data_type, help='Backbone network mobile0.25 or slim or RFB')
     parser.add_argument('--priors_type', default=priors_type, type=str, help='priors type:face or person')
     parser.add_argument('--input_size', nargs='+', help="define network input size", type=int, default=[320, 320])
-    parser.add_argument('--num_workers', default=num_workers, type=int, help='Number of workers used in dataloading')
+    parser.add_argument('--num_workers', default=0, type=int, help='Number of workers used in dataloading')
     parser.add_argument('--max_epoch', default=150, type=int, help='gpu_id')
     parser.add_argument('--gpu_id', default="0", type=str, help='gpu_id')
     parser.add_argument('--batch_size', default=batch_size, type=int, help='batch_size')
@@ -145,7 +145,8 @@ class Trainer(object):
 
     def build_net(self, net_type, priors_type):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type)
-        net = nets.build_net(net_type, priorbox.prior_cfg, width_mult=self.width_mult, phase='train')
+        # net = nets.build_net(net_type, priorbox, width_mult=self.width_mult, phase='train', device=self.device)
+        net = nets.build_net_v2(net_type, priorbox, width_mult=self.width_mult, phase='train', device=self.device)
         print("Printing net...")
         # print(net)
         if self.resume:
