@@ -7,7 +7,7 @@ import math
 
 
 class PriorBox(object):
-    def __init__(self, input_size: list, priors_type="face", freeze_header=False):
+    def __init__(self, input_size: list, priors_type="face", freeze_header=True):
         super(PriorBox, self).__init__()
         self.priors_type = priors_type
         if priors_type == "face":

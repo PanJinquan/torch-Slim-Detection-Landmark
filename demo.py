@@ -60,6 +60,7 @@ class Detector(object):
                  input_size=[320, 320],
                  prob_threshold=0.6,
                  iou_threshold=0.4,
+                 freeze_header=False,
                  top_k=5000,
                  keep_top_k=750,
                  device="cpu"):
@@ -82,6 +83,8 @@ class Detector(object):
         self.top_k = top_k
         self.keep_top_k = keep_top_k
         self.input_size = input_size
+        self.freeze_header = freeze_header
+
         self.net, self.prior_boxes = self.build_net(self.net_type, self.priors_type)
         self.priors_cfg = self.prior_boxes.get_prior_cfg()
         self.priors = self.prior_boxes.priors.to(self.device)
@@ -89,9 +92,9 @@ class Detector(object):
         print('Finished loading model!')
 
     def build_net(self, net_type, priors_type):
-        priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type)
-        net = nets.build_net(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
-        # net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type, freeze_header=self.freeze_header)
+        # net = nets.build_net(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
         net = net.to(self.device)
         return net, priorbox
 
@@ -246,10 +249,12 @@ class Detector(object):
         """
         bboxes = dets[:, 0:4]
         scores = dets[:, 4:5]
-        # boxes_name = ["{}:{:3.4f}".format(l, s) for l, s in zip(labels, probs)]
-        if not landms is None:
+        if not landms is None and len(landms) > 0:
             landms = landms.reshape(len(landms), -1, 2)
             image = image_processing.draw_landmark(image, landms, vis_id=False)
+        print("bboxes:{}".format(bboxes))
+        print("scores:{}".format(scores))
+        print("landms:{}".format(landms))
         image = image_processing.draw_image_detection_bboxes(image, bboxes, scores, labels)
         image_processing.cv_show_image("image", image)
 

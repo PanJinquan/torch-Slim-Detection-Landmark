@@ -29,8 +29,8 @@ print(torch.cuda.device_count())
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_no_RandomAffineResizePadding2_20210615104418/model/best_model_RFB_landm_198_loss7.4634.pth"
-    # model_path ="work_space/rfb_ldmks_face_320_320.pth"
+    # model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_no_RandomAffineResizePadding2_20210615104418/model/best_model_RFB_landm_198_loss7.4634.pth"
+    model_path = "work_space/best_model_RFB_landm_029_loss10.7672.pth"
     net_type = "rfb_landm"
     priors_type = "face"
     parser = argparse.ArgumentParser(description='Face Detection Test')
@@ -51,41 +51,6 @@ def get_parser():
 
 
 class Detector(demo.Detector):
-    def __init__(self,
-                 model_path,
-                 net_type="RFB",
-                 priors_type="face",
-                 input_size=[320, 320],
-                 prob_threshold=0.6,
-                 iou_threshold=0.4,
-                 top_k=5000,
-                 keep_top_k=750,
-                 device="cpu"):
-        """
-        :param model_path:
-        :param net_type:"RFB",
-        :param input_size:input_size,
-        :param network: Backbone network mobile0.25 or slim or RFB
-        :param prob_threshold: confidence_threshold
-        :param iou_threshold: nms_threshold
-        :param top_k:
-        :param keep_top_k:
-        :param device:
-        """
-        self.device = device
-        self.net_type = net_type
-        self.priors_type = priors_type
-        self.prob_threshold = prob_threshold
-        self.iou_threshold = iou_threshold
-        self.top_k = top_k
-        self.keep_top_k = keep_top_k
-        self.input_size = input_size
-        self.net, self.prior_boxes = self.build_net(self.net_type, self.priors_type)
-        self.priors_cfg = self.prior_boxes.get_prior_cfg()
-        self.priors = self.prior_boxes.priors.to(self.device)
-        self.net = self.load_model(self.net, model_path)
-        print('Finished loading model!')
-
     @debug.run_time_decorator("post_process")
     def pose_process(self, output, image_size):
         """
@@ -99,9 +64,6 @@ class Detector(demo.Detector):
         :return:
         """
         boxes, conf, landms = output
-        if self.priors is None:
-            priorbox = PriorBox(self.input_size, self.priors_type)
-            self.priors = priorbox.priors.to(self.device)
         bboxes_scale = np.asarray(image_size * 2)
         landms_scale = np.asarray(image_size * 5)
         if not self.prior_boxes.freeze_header:
