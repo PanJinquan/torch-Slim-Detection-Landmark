@@ -4,10 +4,9 @@
     @E-mail : pan_jinquan@163.com
     @Date   : 2021-03-12 10:05:31
 """
-import os
-from models.backbone.retinaface_landm import RetinaFaceLandm
-from models.backbone.net_slim import SlimLandm
-from models.backbone.net_rfb import RFBLandm, RFB
+from models.backbone.nn.net_retinaface_landm import RetinaFaceLandm
+from models.backbone.nn.net_slim import SlimLandm
+from models.backbone.nn.net_rfb import RFBLandm, RFB
 from models.backbone.ssd.mb_tiny_fd import create_mb_tiny_slim_fd
 from models.backbone.ssd.mb_tiny_RFB_fd import create_mb_tiny_rfb_fd
 from models.backbone.ssd.mb_tiny_RFB_landms import create_mb_tiny_rfb_landms
@@ -40,9 +39,9 @@ def build_net_v2(net_type: str, prior_boxes, width_mult=1.0, phase='train', devi
         create_net = create_mb_tiny_rfb_fd
     elif net_type.lower() == 'mbv2'.lower():
         create_net = create_mobilenetv2_ssd_lite
-    elif net_type.lower() == 'RFBLandm'.lower():
+    elif net_type.lower() == 'RFB_landm'.lower():
         create_net = create_mb_tiny_rfb_landms
-    elif net_type.lower() == 'MBV2Landm'.lower():
+    elif net_type.lower() == 'MBV2_Landm'.lower():
         create_net = create_mobilenetv2_ssd_landms
     else:
         create_net = None

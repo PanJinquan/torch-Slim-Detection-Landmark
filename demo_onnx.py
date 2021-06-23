@@ -17,15 +17,11 @@ sys.path.append(os.getcwd())
 
 import argparse
 import torch
-import cv2
 import numpy as np
-import models.config.config as config
 import demo
 from models import onnx_detector
-from models.layers.functions.prior_box import PriorBox
-from utils import box_utils
-from utils.nms.py_cpu_nms import py_cpu_nms
-from utils import image_processing, debug, file_processing
+from models.backbone.layers.functions import PriorBox
+from utils import debug
 
 
 def get_parser():

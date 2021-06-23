@@ -1,18 +1,16 @@
-from __future__ import print_function
 import os
+import sys
+import argparse
 import torch
 import torch.optim as optim
-import argparse
 import torch.utils.data as data
 from models.dataloader.parser_voc_landmark import VOCLandmarkDataset
 from models.dataloader.parser_voc import VOCDataset
 # from models.dataloader.parser_voc_landmark_preproc import VOCLandmarkDataset
-from models.transforms.data_transforms import TrainLandmsTransform, TestLandmsTransform
-from models.transforms.data_transforms import TrainTransform, TestTransform
-from models.dataloader import WiderFaceDetection, detection_collate, preproc, val_preproc
-from models.layers import MultiBoxLandmLoss, MultiBoxLoss
-from models.layers.functions.prior_box import PriorBox
-import sys
+from models.transforms.data_transforms import TrainTransform
+from models.dataloader import WiderFaceDetection, detection_collate
+from models.backbone.layers import MultiBoxLoss
+from models.backbone.layers.functions.prior_box import PriorBox
 from models import nets
 from utils import file_processing, debug, torch_tools
 from tensorboardX import SummaryWriter
@@ -80,11 +78,8 @@ def get_parser():
     return args
 
 
-args = get_parser()
-
-
 class Trainer(object):
-    def __init__(self):
+    def __init__(self, args):
         torch_tools.set_env_random_seed()
         self.num_workers = args.num_workers
         self.momentum = args.momentum
@@ -104,6 +99,9 @@ class Trainer(object):
         self.num_epochs = args.max_epoch
         self.flag = args.flag
         self.resume = args.resume
+        self.optimizer_type = args.optimizer_type
+        self.scheduler = args.scheduler
+        self.milestones = args.milestones
 
         dataset_name = [os.path.basename(os.path.dirname(path)) for path in args.train_path]
         flag = [self.net_type + str(self.width_mult), self.priors_type, self.input_size[0], self.input_size[1],
@@ -134,21 +132,24 @@ class Trainer(object):
         self.class_names = self.prior_boxes.class_names
         self.num_classes = self.prior_boxes.num_classes
 
-        self.train_loader, self.val_loader = self.load_trainval_dataset(args.train_path, args.val_path,
-                                                                        self.data_type, args.check)
+        self.train_loader, self.val_loader = self.load_trainval_dataset(args.train_path,
+                                                                        args.val_path,
+                                                                        self.data_type,
+                                                                        args.check)
         self.optimizer = optim.SGD(self.net.parameters(),
                                    lr=self.initial_lr,
                                    momentum=self.momentum,
                                    weight_decay=self.weight_decay)
         self.criterion = MultiBoxLoss(self.num_classes, 0.35, True, 0, True, 7, 0.35, False, self.device)
-        self.scheduler = self.lr_scheduler()
+        self.lr_scheduler = self.get_lr_scheduler(self.scheduler, self.optimizer_type, self.milestones)
+        self.logging.info("net_type   :{}".format(self.net_type))
+        self.logging.info("priors_type:{}".format(self.priors_type))
+        self.logging.info("priors nums:{}".format(len(self.priors)))
 
     def build_net(self, net_type, priors_type):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type)
         # net = nets.build_net(net_type, priorbox, width_mult=self.width_mult, phase='train', device=self.device)
         net = nets.build_net_v2(net_type, priorbox, width_mult=self.width_mult, phase='train', device=self.device)
-        print("Printing net...")
-        # print(net)
         if self.resume:
             self.logging.info(f"Resume from the model {self.resume}")
             state_dict = torch_tools.load_state_dict(self.resume, module=False)
@@ -198,21 +199,23 @@ class Trainer(object):
         self.logging.info("===" * 15)
         return train_loader, val_loader
 
-    def lr_scheduler(self):
-        if args.optimizer_type != "Adam":
-            if args.scheduler == 'multi-step':
+    def get_lr_scheduler(self, scheduler, optimizer_type, milestones):
+        lr_scheduler = None
+        if optimizer_type != "Adam":
+            if scheduler == 'multi-step':
                 self.logging.info("Uses MultiStepLR scheduler.")
-                milestones = [int(v.strip()) for v in args.milestones.split(",")]
-                scheduler = MultiStepLR(self.optimizer, milestones=milestones,
-                                        gamma=0.1, last_epoch=self.last_epoch)
-            elif args.scheduler == 'cosine':
+                milestones = [int(v.strip()) for v in milestones.split(",")]
+                lr_scheduler = MultiStepLR(self.optimizer, milestones=milestones,
+                                           gamma=0.1, last_epoch=self.last_epoch)
+            elif scheduler == 'cosine':
                 self.logging.info("Uses CosineAnnealingLR scheduler.")
-                scheduler = CosineAnnealingLR(self.optimizer, args.t_max, last_epoch=self.last_epoch)
-            elif args.scheduler == 'poly':
+                t_max = len(self.train_loader) * self.num_epochs
+                lr_scheduler = CosineAnnealingLR(self.optimizer, t_max, last_epoch=self.last_epoch)
+            elif scheduler == 'poly':
                 self.logging.info("Uses PolyLR scheduler.")
             else:
-                self.logging.fatal(f"Unsupported Scheduler: {args.scheduler}.")
-        return scheduler
+                self.logging.fatal(f"Unsupported Scheduler: {scheduler}.")
+        return lr_scheduler
 
     def adjust_learning_rate(self, optimizer, gamma, epoch, step_index, iteration, epoch_size):
         """Sets the learning rate
@@ -234,14 +237,14 @@ class Trainer(object):
         self.logging.info("Start training from epoch {}".format(self.last_epoch + 1))
         self.logging.info("work_dir:{}".format(self.save_folder))
         for epoch in range(self.last_epoch + 1, self.num_epochs):
-            if args.optimizer_type != "Adam" and args.scheduler != "poly":
-                self.scheduler.step()
-            self.train_step(epoch, epoch_size)
-            val_loss = self.val_model(epoch)
+            if self.optimizer_type != "Adam" and self.scheduler != "poly":
+                self.lr_scheduler.step()
+            self.train_epoch(epoch, epoch_size)
+            val_loss = self.val_epoch(epoch)
             self.save_model(self.net, epoch, val_loss)
             self.logging.info("===" * 10)
 
-    def train_step(self, epoch, epoch_size):
+    def train_epoch(self, epoch, epoch_size):
         self.net.train()
         sum_loss = 0.0
         sum_loss_l = 0.0
@@ -285,8 +288,8 @@ class Trainer(object):
                 sum_loss_l = 0.0
                 sum_loss_c = 0.0
 
-    def val_model(self, epoch):
-        self.logging.info("val_model...")
+    def val_epoch(self, epoch):
+        self.logging.info("val_epoch...")
         self.logging.info("work_dir:{}".format(self.save_folder))
         self.net.eval()
         avg_loss = 0.0
@@ -351,5 +354,6 @@ class Trainer(object):
 
 
 if __name__ == '__main__':
-    t = Trainer()
+    args = get_parser()
+    t = Trainer(args)
     t.start_train()

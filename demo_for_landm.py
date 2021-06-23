@@ -16,14 +16,12 @@ sys.path.append("../..")
 sys.path.append(os.getcwd())
 import argparse
 import torch
-import cv2
 import numpy as np
 import demo
-from models import nets
-from models.layers.functions.prior_box import PriorBox
-from utils import box_utils
+from models.backbone.layers.functions.prior_box import PriorBox
+from models.backbone.utils import box_code_utils
 from utils.nms.py_cpu_nms import py_cpu_nms
-from utils import image_processing, debug, file_processing, torch_tools
+from utils import debug
 
 print(torch.cuda.device_count())
 
@@ -31,7 +29,7 @@ print(torch.cuda.device_count())
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    model_path = "/home/dm/data3/FaceDetector/Face-Detector-1MB-with-landmark/work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_no_RandomAffineResizePadding2_20210615104418/model/best_model_RFB_landm_198_loss7.4634.pth"
+    model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_no_RandomAffineResizePadding2_20210615104418/model/best_model_RFB_landm_198_loss7.4634.pth"
     # model_path ="work_space/rfb_ldmks_face_320_320.pth"
     net_type = "rfb_landm"
     priors_type = "face"
@@ -100,22 +98,24 @@ class Detector(demo.Detector):
         :param iou_threshold:
         :return:
         """
-        loc, conf, landms = output
+        boxes, conf, landms = output
         if self.priors is None:
             priorbox = PriorBox(self.input_size, self.priors_type)
             self.priors = priorbox.priors.to(self.device)
         bboxes_scale = np.asarray(image_size * 2)
         landms_scale = np.asarray(image_size * 5)
-        # get boxes
-        boxes = box_utils.decode(loc.data.squeeze(0), self.priors,
-                                 [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
+        if not self.prior_boxes.freeze_header:
+            # get boxes
+            boxes = box_code_utils.decode(boxes.data.squeeze(0), self.priors,
+                                          [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
+            # get landmarks
+            # landms = box_utils.decode_landm(landms.data.squeeze(0), self.priorbox, variance)
+            landms = box_code_utils.decode_landm(landms.data.squeeze(0), self.priors,
+                                                 [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
+
         boxes = boxes.cpu().numpy()
         conf = conf.squeeze(0).data.cpu().numpy()
         boxes = boxes * bboxes_scale
-        # get landmarks
-        # landms = box_utils.decode_landm(landms.data.squeeze(0), self.priorbox, variance)
-        landms = box_utils.decode_landm(landms.data.squeeze(0), self.priors,
-                                        [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
         landms = landms.squeeze(0)
         landms = landms.cpu().numpy()
         landms = landms * landms_scale

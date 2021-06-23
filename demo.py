@@ -19,10 +19,10 @@ import torch
 import cv2
 import numpy as np
 from models import nets
-from models.layers.functions.prior_box import PriorBox
-from utils import box_utils
+from models.backbone.layers.functions.prior_box import PriorBox
+from models.backbone.utils import box_code_utils
 from utils.nms.py_cpu_nms import py_cpu_nms
-from utils import image_processing, debug, file_processing, torch_tools
+from utils import image_processing, file_processing, torch_tools
 
 print(torch.cuda.device_count())
 
@@ -90,8 +90,8 @@ class Detector(object):
 
     def build_net(self, net_type, priors_type):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type)
-        # net = nets.build_net(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
-        net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        net = nets.build_net(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        # net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
         net = net.to(self.device)
         return net, priorbox
 
@@ -137,14 +137,12 @@ class Detector(object):
         :param iou_threshold:
         :return:
         """
-        loc, conf = output
-        if self.priors is None:
-            priorbox = PriorBox(self.input_size, self.priors_type)
-            self.priors = priorbox.priors.to(self.device)
+        boxes, conf = output
         bboxes_scale = np.asarray(image_size * 2)
         # get boxes
-        boxes = box_utils.decode(loc.data.squeeze(0), self.priors,
-                                 [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
+        if not self.prior_boxes.freeze_header:
+            boxes = box_code_utils.decode(boxes.data.squeeze(0), self.priors,
+                                          [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
         boxes = boxes.cpu().numpy()
         conf = conf.squeeze(0).data.cpu().numpy()
         boxes = boxes * bboxes_scale

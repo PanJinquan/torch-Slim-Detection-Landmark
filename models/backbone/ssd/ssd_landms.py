@@ -6,7 +6,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from ..utils import box_utils
+# from ..utils import box_utils
+from models.backbone.utils import box_code_utils
 
 GraphPath = namedtuple("GraphPath", ['s0', 'name', 's1'])
 
@@ -107,19 +108,13 @@ class SSD(nn.Module):
             confidences = F.softmax(confidences, dim=2)
             # boxes = locations  # this line should be added.
             if self.freeze_header:
-                locations = box_utils.convert_locations_to_boxes(locations,
-                                                                 self.priors,
-                                                                 self.center_variance,
-                                                                 self.size_variance)
-                locations = box_utils.center_form_to_corner_form(locations)
-                # landms = box_utils.decode_landm(landms, self.priors,
-                #                                 variances=[self.center_variance, self.size_variance])
-                landms = box_utils.decode_landms(landms, self.priors,
-                                                 variances=[self.center_variance,
-                                                            self.size_variance])
-            return confidences, locations, landms
+                locations = box_code_utils.decode(locations.data.squeeze(0), self.priors,
+                                                  [self.center_variance, self.size_variance])
+                landms = box_code_utils.decode_landm(landms.data.squeeze(0), self.priors,
+                                                     [self.center_variance, self.size_variance])
+            return locations, confidences, landms
         else:
-            return confidences, locations, landms
+            return locations, confidences, landms
 
     def compute_header(self, i, x):
         """
@@ -192,7 +187,7 @@ class MatchPriorLandms(object):
         """
         self.center_form_priors = center_form_priors  # [cx,cy,w,h]
         # [cx,cy,w,h]->[xmin,ymin,xmax,ymax]
-        self.corner_form_priors = box_utils.center_form_to_corner_form(center_form_priors)
+        self.corner_form_priors = box_code_utils.center_form_to_corner_form(center_form_priors)
         self.center_variance = center_variance
         self.size_variance = size_variance
         self.iou_threshold = iou_threshold
@@ -211,20 +206,20 @@ class MatchPriorLandms(object):
             gt_labels = torch.from_numpy(gt_labels)
         if type(gt_landms) is np.ndarray:
             gt_landms = torch.from_numpy(gt_landms)
-        boxes, labels, landms = box_utils.assign_priors_landms(gt_boxes,
-                                                               gt_labels,
-                                                               gt_landms,
-                                                               self.corner_form_priors,
-                                                               self.iou_threshold)
+        boxes, labels, landms = box_code_utils.assign_priors_landms(gt_boxes,
+                                                                    gt_labels,
+                                                                    gt_landms,
+                                                                    self.corner_form_priors,
+                                                                    self.iou_threshold)
         # [xmin,ymin,xmax,ymax]-> [cx,cy,w,h]
-        boxes = box_utils.corner_form_to_center_form(boxes)
-        locations = box_utils.convert_boxes_to_locations(boxes,
-                                                         self.center_form_priors,
-                                                         self.center_variance,
-                                                         self.size_variance)
-        landms = box_utils.encode_landm(landms,
-                                        self.center_form_priors,
-                                        variances=[self.center_variance, self.size_variance])
+        boxes = box_code_utils.corner_form_to_center_form(boxes)
+        locations = box_code_utils.convert_boxes_to_locations(boxes,
+                                                              self.center_form_priors,
+                                                              self.center_variance,
+                                                              self.size_variance)
+        landms = box_code_utils.encode_landm(landms,
+                                             self.center_form_priors,
+                                             variances=[self.center_variance, self.size_variance])
         return locations, labels, landms
 
 

@@ -3,9 +3,9 @@ import torch.nn as nn
 import torchvision.models._utils as _utils
 import torch.nn.functional as F
 
-from models.backbone.net import MobileNetV1 as MobileNetV1
-from models.backbone.net import FPN as FPN
-from models.backbone.net import SSH as SSH
+from .net import MobileNetV1 as MobileNetV1
+from .net import FPN as FPN
+from .net import SSH as SSH
 
 
 

@@ -1,17 +1,17 @@
-from __future__ import print_function
 import os
+import sys
+import argparse
 import torch
 import torch.optim as optim
-import argparse
 import torch.utils.data as data
+import train
 from models.dataloader.parser_voc_landmark import VOCLandmarkDataset
 from models.dataloader.parser_voc import VOCDataset
 # from models.dataloader.parser_voc_landmark_preproc import VOCLandmarkDataset
 from models.transforms.data_transforms import TrainLandmsTransform, TestLandmsTransform
 from models.dataloader import WiderFaceDetection, detection_collate, preproc, val_preproc
-from models.layers import MultiBoxLandmLoss
-from models.layers.functions.prior_box import PriorBox
-import sys
+from models.backbone.layers import MultiBoxLandmLoss
+from models.backbone.layers.functions.prior_box import PriorBox
 from models import nets
 from utils import file_processing, debug, torch_tools
 from tensorboardX import SummaryWriter
@@ -20,13 +20,10 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, MultiStepLR
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Training')
-    # net_type = "rfb_face_person"
-
     # train_path = '/home/dm/panjinquan3/widerface/train/train.txt'
     # val_path = '/home/dm/panjinquan3/widerface/train/val.txt'
     # data_type = "WiderFace"
     net_type = "rfb_landm"
-
     # train_path1 = "/home/dm/panjinquan3/MPII/trainval.txt"
     # val_path = "/home/dm/panjinquan3/MPII/test.txt"
     # train_path = "/home/dm/panjinquan3/wider_face_add_lm_10_10/trainval.txt"
@@ -78,106 +75,10 @@ def get_parser():
     return args
 
 
-args = get_parser()
-
-
-class Trainer(object):
-    def __init__(self):
-        torch_tools.set_env_random_seed()
-        self.num_workers = args.num_workers
-        self.momentum = args.momentum
-        self.weight_decay = args.weight_decay
-        self.initial_lr = args.lr
-        self.gamma = args.gamma
-        self.start_save = args.start_save
-        self.save_folder = args.save_folder
-        self.last_epoch = args.last_epoch
-        self.width_mult = args.width_mult
-        self.net_type = args.net_type
-        self.priors_type = args.priors_type
-        self.log_freq = args.log_freq
-        self.input_size = args.input_size
-        self.batch_size = args.batch_size
-        self.data_type = args.data_type
-        self.num_epochs = args.max_epoch
-        self.flag = args.flag
-        self.resume = args.resume
-
-        dataset_name = [os.path.basename(os.path.dirname(path)) for path in args.train_path]
-        flag = [self.net_type + str(self.width_mult), self.priors_type, self.input_size[0], self.input_size[1],
-                "_".join(dataset_name), str(self.flag), str(file_processing.get_time())]
-        flag = [str(f) for f in flag if f]
-
-        self.save_folder = os.path.join(args.save_folder, "_".join(flag))
-        self.model_dir = os.path.join(self.save_folder, "model")
-        self.log_dir = os.path.join(self.save_folder, "log")
-        self.logfile = os.path.join(self.log_dir, "log.txt")
-        self.writer = SummaryWriter(self.log_dir)
-        file_processing.create_dir(self.model_dir)
-        file_processing.create_file_path(self.logfile)
-        self.logfile = os.path.join(self.save_folder, "log.txt")
-        self.logging = debug.set_logger(logfile=self.logfile)
-        self.logging.info("{}".format(args))
-        self.logging.info("save_folder:{}".format(self.save_folder))
-
-        self.gpu_id = [int(v.strip()) for v in args.gpu_id.split(",")]
-        self.device = torch.device("cuda:{}".format(self.gpu_id[0]))
-        self.net, self.prior_boxes = self.build_net(self.net_type, self.priors_type)
-        self.priors_cfg = self.prior_boxes.get_prior_cfg()
-        self.priors = self.prior_boxes.priors.to(self.device)
-        # self.class_names = self.prior_boxes.class_names
-        # self.num_classes = self.prior_boxes.num_classes
-        self.rgb_mean = self.prior_boxes.image_mean  # bgr order
-        self.rgb_std = self.prior_boxes.image_std  # bgr order
-        self.class_names = self.prior_boxes.class_names
-        self.num_classes = self.prior_boxes.num_classes
-
-        self.train_loader, self.val_loader = self.load_trainval_dataset(args.train_path, args.val_path,
-                                                                        self.data_type, args.check)
-        self.optimizer = optim.SGD(self.net.parameters(),
-                                   lr=self.initial_lr,
-                                   momentum=self.momentum,
-                                   weight_decay=self.weight_decay)
+class Trainer(train.Trainer):
+    def __init__(self, args):
+        super(Trainer, self).__init__(args)
         self.criterion = MultiBoxLandmLoss(self.num_classes, 0.35, True, 0, True, 7, 0.35, False, self.device)
-        self.scheduler = self.lr_scheduler()
-
-    def build_net(self, net_type, priors_type):
-        priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type)
-        net = nets.build_net(net_type, priorbox.prior_cfg, width_mult=self.width_mult, phase='train')
-        print("Printing net...")
-        print(net)
-        if self.resume:
-            self.logging.info(f"Resume from the model {self.resume}")
-            state_dict = torch_tools.load_state_dict(self.resume, module=False)
-            net.load_state_dict(state_dict)
-        net = torch.nn.DataParallel(net, device_ids=self.gpu_id)
-        net = net.to(self.device)
-        return net, priorbox
-
-    def load_dataset(self, files, data_type, transform, phase, check=True):
-        datasets = []
-        for path in files:
-            self.logging.info('Loading {} Data:{}'.format(phase, path))
-            if data_type == "WiderFace":
-                dataset = WiderFaceDetection(path, transform)
-            elif data_type == "VOC":
-                dataset = VOCDataset(filename=path,
-                                     class_names=self.prior_boxes.class_names,
-                                     transform=transform,
-                                     check=check,
-                                     shuffle=False)
-            elif data_type == "VOCLandm":
-                dataset = VOCLandmarkDataset(filename=path,
-                                             class_names=self.prior_boxes.class_names,
-                                             transform=transform,
-                                             check=check)
-                assert self.num_classes == len(dataset.class_names)
-            else:
-                raise Exception("Error:{}".format(data_type))
-            datasets.append(dataset)
-        datasets = data.ConcatDataset(datasets)
-        self.logging.info("have {} data: {}".format(phase, len(datasets)))
-        return datasets
 
     def load_trainval_dataset(self, train_path, val_path, data_type="VOC", check=True):
         self.logging.info("===" * 15)
@@ -195,50 +96,7 @@ class Trainer(object):
         self.logging.info("===" * 15)
         return train_loader, val_loader
 
-    def lr_scheduler(self):
-        if args.optimizer_type != "Adam":
-            if args.scheduler == 'multi-step':
-                self.logging.info("Uses MultiStepLR scheduler.")
-                milestones = [int(v.strip()) for v in args.milestones.split(",")]
-                scheduler = MultiStepLR(self.optimizer, milestones=milestones,
-                                        gamma=0.1, last_epoch=self.last_epoch)
-            elif args.scheduler == 'cosine':
-                self.logging.info("Uses CosineAnnealingLR scheduler.")
-                scheduler = CosineAnnealingLR(self.optimizer, args.t_max, last_epoch=self.last_epoch)
-            elif args.scheduler == 'poly':
-                self.logging.info("Uses PolyLR scheduler.")
-            else:
-                self.logging.fatal(f"Unsupported Scheduler: {args.scheduler}.")
-        return scheduler
-
-    def adjust_learning_rate(self, optimizer, gamma, epoch, step_index, iteration, epoch_size):
-        """Sets the learning rate
-        # Adapted from PyTorch Imagenet example:
-        # https://github.com/pytorch/examples/blob/master/imagenet/main.py
-        """
-        warmup_epoch = -1
-        if epoch <= warmup_epoch:
-            lr = 1e-6 + (self.initial_lr - 1e-6) * iteration / (epoch_size * warmup_epoch)
-        else:
-            lr = self.initial_lr * (gamma ** (step_index))
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
-        return lr
-
-    def start_train(self):
-        self.min_loss = sys.maxsize
-        epoch_size = len(self.train_loader)
-        self.logging.info("Start training from epoch {}".format(self.last_epoch + 1))
-        self.logging.info("work_dir:{}".format(self.save_folder))
-        for epoch in range(self.last_epoch + 1, self.num_epochs):
-            if args.optimizer_type != "Adam" and args.scheduler != "poly":
-                self.scheduler.step()
-            self.train_step(epoch, epoch_size)
-            val_loss = self.val_model(epoch)
-            self.save_model(self.net, epoch, val_loss)
-            self.logging.info("===" * 10)
-
-    def train_step(self, epoch, epoch_size):
+    def train_epoch(self, epoch, epoch_size):
         self.net.train()
         sum_loss = 0.0
         sum_loss_l = 0.0
@@ -288,8 +146,8 @@ class Trainer(object):
                 sum_loss_c = 0.0
                 sum_loss_landm = 0.0
 
-    def val_model(self, epoch):
-        self.logging.info("val_model...")
+    def val_epoch(self, epoch):
+        self.logging.info("val_epoch...")
         self.logging.info("work_dir:{}".format(self.save_folder))
         self.net.eval()
         avg_loss = 0.0
@@ -333,31 +191,8 @@ class Trainer(object):
         self.writer.add_scalar("lr", lr, epoch)
         return avg_loss
 
-    def save_model(self, model, epoch, loss):
-        """
-        :param model:
-        :param out_layer:
-        :param epoch:
-        :param logs:
-        :param start_save:
-        :return:
-        """
-        start_save = self.start_save if self.start_save else self.num_epochs - 10
-        if epoch >= start_save:
-            model_name = "model_{}_{:03d}_loss{:.4f}.pth".format(self.net_type, epoch, loss)
-            model_path = os.path.join(self.model_dir, model_name)
-            torch.save(model.module.state_dict(), model_path)
-            self.logging.info("save model in:{}".format(model_path))
-
-        if self.min_loss >= loss:
-            self.min_loss = loss
-            model_name = "best_model_{}_{:03d}_loss{:.4f}.pth".format(self.net_type, epoch, loss)
-            best_model_path = os.path.join(self.model_dir, model_name)
-            file_processing.remove_prefix_files(self.model_dir, "best_model_*")
-            torch.save(model.module.state_dict(), best_model_path)
-            self.logging.info("save best_model_path in:{}".format(best_model_path))
-
 
 if __name__ == '__main__':
-    t = Trainer()
+    args = get_parser()
+    t = Trainer(args)
     t.start_train()
