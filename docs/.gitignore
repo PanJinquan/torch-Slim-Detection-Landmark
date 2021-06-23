@@ -1,0 +1,12 @@
+# git rm -r --cached .
+# git add .
+# git commit -m 'update .gitignore'
+
+__pycache__/
+*.py[cod]
+./evaluation/eval_output
+evaluation/eval_output
+.idea/
+docker/codes/
+.polyaxon
+_build/
