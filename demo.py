@@ -60,7 +60,7 @@ class Detector(object):
                  input_size=[320, 320],
                  prob_threshold=0.6,
                  iou_threshold=0.4,
-                 freeze_header=False,
+                 freeze_header=True,
                  top_k=5000,
                  keep_top_k=750,
                  device="cpu"):
@@ -91,10 +91,12 @@ class Detector(object):
         self.net = self.load_model(self.net, model_path)
         print('Finished loading model!')
 
-    def build_net(self, net_type, priors_type):
+    def build_net(self, net_type, priors_type, version="v1"):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type, freeze_header=self.freeze_header)
-        # net = nets.build_net(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
-        net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        if version.lower() == "v1".lower():
+            net = nets.build_net_v1(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        else:
+            net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
         net = net.to(self.device)
         return net, priorbox
 

@@ -29,8 +29,8 @@ print(torch.cuda.device_count())
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    # model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_no_RandomAffineResizePadding2_20210615104418/model/best_model_RFB_landm_198_loss7.4634.pth"
-    model_path = "work_space/best_model_RFB_landm_029_loss10.7672.pth"
+    model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_no_RandomAffineResizePadding2_20210615104418/model/best_model_RFB_landm_198_loss7.4634.pth"
+    # model_path = "work_space/best_model_RFB_landm_029_loss10.7672.pth"
     net_type = "rfb_landm"
     priors_type = "face"
     parser = argparse.ArgumentParser(description='Face Detection Test')

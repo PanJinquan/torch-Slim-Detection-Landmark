@@ -4,6 +4,7 @@ import torchvision.models.detection.backbone_utils as backbone_utils
 import torchvision.models._utils as _utils
 import torch.nn.functional as F
 from collections import OrderedDict
+from ..utils import box_code_utils
 
 
 class BasicConv(nn.Module):
@@ -108,14 +109,14 @@ def conv_dw(inp, oup, stride):
 
 
 class RFBLandm(nn.Module):
-    def __init__(self, cfg=None, phase='train'):
+    def __init__(self, prior_boxes=None, phase='train'):
         """
-        :param cfg:  Network related settings.
+        :param prior_boxes:  Network related settings.
         :param phase: train or test.
         """
         super(RFBLandm, self).__init__()
         self.phase = phase
-        self.num_classes = len(cfg["class_names"])
+        self.num_classes = prior_boxes.num_classes
 
         self.conv1 = conv_bn(3, 16, 2)
         self.conv2 = conv_dw(16, 32, 1)
@@ -140,6 +141,11 @@ class RFBLandm(nn.Module):
             nn.ReLU(inplace=True)
         )
         self.loc, self.conf, self.landm = self.multibox(self.num_classes)
+        if not phase == 'train':
+            self.center_variance = prior_boxes.center_variance
+            self.size_variance = prior_boxes.size_variance
+            self.priors = prior_boxes.priors
+            self.freeze_header = prior_boxes.freeze_header
 
     def multibox(self, num_classes):
         loc_layers = []
@@ -202,21 +208,28 @@ class RFBLandm(nn.Module):
         if self.phase == 'train':
             output = (bbox_regressions, classifications, ldm_regressions)
         else:
+            if self.freeze_header:
+                bbox_regressions = box_code_utils.decode(bbox_regressions.data.squeeze(0),
+                                                         self.priors.to(bbox_regressions.device),
+                                                         [self.center_variance, self.size_variance])
+                ldm_regressions = box_code_utils.decode_landm(ldm_regressions.data.squeeze(0),
+                                                              self.priors.to(bbox_regressions.device),
+                                                              [self.center_variance, self.size_variance])
             output = (bbox_regressions, F.softmax(classifications, dim=-1), ldm_regressions)
         return output
 
 
 class RFB(nn.Module):
-    def __init__(self, cfg=None, phase='train'):
+    def __init__(self, prior_boxes=None, phase='train'):
         """
-        :param cfg:  Network related settings.
+        :param prior_boxes:  Network related settings.
         :param phase: train or test.
         """
         super(RFB, self).__init__()
         self.phase = phase
-        self.num_classes = len(cfg["class_names"])
-        self.aspect_ratios = cfg["aspect_ratios"]
-        self.min_sizes = cfg["min_sizes"]
+        self.num_classes = prior_boxes.num_classes
+        self.aspect_ratios = prior_boxes.aspect_ratios
+        self.min_sizes = prior_boxes.min_sizes
         # [3,2,2,3]
         self.boxes_expand = [len(boxes) * (len(self.aspect_ratios)) for boxes in self.min_sizes]
 
@@ -243,6 +256,11 @@ class RFB(nn.Module):
             nn.ReLU(inplace=True)
         )
         self.loc, self.conf = self.multibox(self.num_classes)
+        if not phase == 'train':
+            self.center_variance = prior_boxes.center_variance
+            self.size_variance = prior_boxes.size_variance
+            self.priors = prior_boxes.priors
+            self.freeze_header = prior_boxes.freeze_header
 
     def multibox(self, num_classes):
         loc_layers = []
@@ -313,5 +331,9 @@ class RFB(nn.Module):
         if self.phase == 'train':
             output = (bbox_regressions, classifications)
         else:
+            if self.freeze_header:
+                bbox_regressions = box_code_utils.decode(bbox_regressions.data.squeeze(0),
+                                                         self.priors.to(bbox_regressions.device),
+                                                         [self.center_variance, self.size_variance])
             output = (bbox_regressions, F.softmax(classifications, dim=-1))
         return output

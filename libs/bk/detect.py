@@ -78,10 +78,10 @@ if __name__ == '__main__':
         net = RetinaFaceLandm(cfg = cfg, phase ='test')
     elif args.network == "slim":
         cfg = cfg_slim
-        net = SlimLandm(cfg = cfg, phase ='test')
+        net = SlimLandm(prior_boxes= cfg, phase ='test')
     elif args.network == "RFB":
         cfg = cfg_rfb
-        net = RFBLandm(cfg = cfg, phase ='test')
+        net = RFBLandm(prior_boxes= cfg, phase ='test')
     else:
         print("Don't support network!")
         exit(0)

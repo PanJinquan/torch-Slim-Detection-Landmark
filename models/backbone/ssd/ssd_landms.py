@@ -7,7 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 # from ..utils import box_utils
-from models.backbone.utils import box_code_utils
+from ..utils import box_code_utils
 
 GraphPath = namedtuple("GraphPath", ['s0', 'name', 's1'])
 

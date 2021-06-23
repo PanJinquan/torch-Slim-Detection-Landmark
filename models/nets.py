@@ -14,19 +14,18 @@ from models.backbone.ssd.mobilenet_v2_ssd_lite import create_mobilenetv2_ssd_lit
 from models.backbone.ssd.mobilenet_v2_ssd_landms import create_mobilenetv2_ssd_landms
 
 
-def build_net(net_type: str, prior_boxes, width_mult=1.0, phase='train', device="cuda:0"):
+def build_net_v1(net_type: str, prior_boxes, width_mult=1.0, phase='train', device="cuda:0"):
     if net_type.lower() == "mobile0.25_landm".lower():
         # prior_cfg = mnet_face_config
         net = RetinaFaceLandm(cfg=prior_boxes.prior_cfg, phase=phase)
     elif net_type.lower() == "slim_landm".lower():
-        # prior_cfg = slim_face_config
-        net = SlimLandm(cfg=prior_boxes.prior_cfg, phase=phase)
+        net = SlimLandm(prior_boxes=prior_boxes, phase=phase)
     elif net_type.lower() == "RFB_landm".lower():
         # prior_cfg = rfb_face_config
-        net = RFBLandm(cfg=prior_boxes.prior_cfg, phase=phase)
+        net = RFBLandm(prior_boxes=prior_boxes, phase=phase)
     elif net_type.lower() == "RFB".lower():
         # prior_cfg = rfb_face_config
-        net = RFB(cfg=prior_boxes.prior_cfg, phase=phase)
+        net = RFB(prior_boxes=prior_boxes, phase=phase)
     else:
         raise Exception("Error:{}".format(net_type))
     return net

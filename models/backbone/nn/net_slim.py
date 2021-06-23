@@ -31,14 +31,14 @@ def conv_dw(inp, oup, stride):
     )
 
 class SlimLandm(nn.Module):
-    def __init__(self, cfg = None, phase = 'train'):
+    def __init__(self, prior_boxes = None, phase ='train'):
         """
-        :param cfg:  Network related settings.
+        :param prior_boxes:  Network related settings.
         :param phase: train or test.
         """
         super(SlimLandm, self).__init__()
         self.phase = phase
-        self.num_classes = len(cfg["class_names"])
+        self.num_classes = prior_boxes.num_classes
 
         self.conv1 = conv_bn(3, 16, 2)
         self.conv2 = conv_dw(16, 32, 1)
