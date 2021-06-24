@@ -25,8 +25,7 @@ from utils import debug
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    # model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_no_RandomAffineResizePadding2_20210615104418/model/best_model_RFB_landm_198_loss7.4634.pth"
-    model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_v2_ssd_20210623200302/model/best_model_RFB_landm_175_loss7.5042.pth"
+    model_path = "work_space/best_model_RFB_landm_116_loss7.3498.pth"
     net_type = "rfb_landm"
     priors_type = "face"
     parser = argparse.ArgumentParser(description='Face Detection Test')
@@ -47,6 +46,10 @@ def get_parser():
 
 
 class Detector(demo.Detector):
+
+    def build_net(self, net_type, priors_type, version="v2"):
+        return super().build_net(net_type, priors_type, version)
+
     @debug.run_time_decorator("post_process")
     def pose_process(self, output, image_size):
         """

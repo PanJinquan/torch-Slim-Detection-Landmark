@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # --------------------------------------------------------
-# @Project: ultra-light-fast-generic-face-detector-1MB
+# @Project: torch-Slim-Detection-Landmark
 # @Author : panjq
 # @E-mail : pan_jinquan@163.com
 # @Date   : 2020-04-03 18:38:34
@@ -28,8 +28,7 @@ from utils import image_processing, file_processing, torch_tools
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    # model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v2_20210615210557/model/best_model_RFB_150_loss2.8792.pth"
-    model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v4_20210622194254/model/best_model_RFB_176_loss2.7943.pth"
+    model_path = "work_space/best_model_RFB_063_loss3.0318.pth"
     # model_path ="work_space/rfb_ldmks_face_320_320.pth"
     net_type = "rfb"
     priors_type = "face_person"

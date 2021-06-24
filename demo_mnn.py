@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 # --------------------------------------------------------
-# @Project: ultra-light-fast-generic-face-detector-1MB
+# @Project: torch-Slim-Detection-Landmark
 # @Author : panjq
 # @E-mail : pan_jinquan@163.com
 # @Date   : 2020-04-03 18:38:34
@@ -127,12 +127,4 @@ if __name__ == '__main__':
                       keep_top_k=keep_top_k,
                       input_size=input_size,
                       device=device)
-    # det.detect_image_dir(image_dir, isshow=False)
-    # det.detect_image_dir(image_dir, isshow=False)
-    # det.detect_image_dir(image_dir, isshow=False)
-    # det.detect_image_dir(image_dir, isshow=False)
-    # det.detect_image_dir(image_dir, isshow=False)
-    # det.detect_image_dir(image_dir, isshow=False)
-    # det.detect_image_dir(image_dir, isshow=False)
-    # det.detect_image_dir(image_dir, isshow=False)
     det.detect_image_dir(image_dir, isshow=True)

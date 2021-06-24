@@ -1,7 +1,6 @@
 # -*-coding: utf-8 -*-
 """
-    @Project: Pytorch-SSDLandmark
-    @File   : ssd_detector.py
+    @Project: torch-Slim-Detection-Landmark
     @Author : panjq
     @E-mail : pan_jinquan@163.com
     @Date   : 2019-11-11 14:55:55

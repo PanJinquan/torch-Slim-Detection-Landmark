@@ -1,12 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-# --------------------------------------------------------
-# @Project: ultra-light-fast-generic-face-detector-1MB
-# @Author : panjq
-# @E-mail : pan_jinquan@163.com
-# @Date   : 2020-04-03 18:38:34
-# --------------------------------------------------------
-"""
 from __future__ import print_function
 import os, sys
 
