@@ -9,8 +9,8 @@ datasets_root3="/data3/panjinquan/dataset/face_person/FDDB/trainval.txt"
 
 
 val_path="/data3/panjinquan/dataset/face_person/wider_face_add_lm_10_10/test.txt"
-train_path=$datasets_root1
-#train_path=$datasets_root1" "$datasets_root2" "$datasets_root3
+#train_path=$datasets_root1
+train_path=$datasets_root1" "$datasets_root2" "$datasets_root3
 echo $train_path
 
 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -u train_for_landm.py \
@@ -20,7 +20,7 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -u train_for_landm.py \
     --net_type "RFB_landm" \
     --priors_type "face" \
     --num_workers 4 \
-    --gpu_id 4 \
+    --gpu_id 6 \
     --input_size 320 320 \
     --batch_size 128 \
     --max_epoch 200 \

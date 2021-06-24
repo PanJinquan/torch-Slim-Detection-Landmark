@@ -116,7 +116,7 @@ class TrainLandmsTransform:
         self.augment = augment_bbox_landm.Compose([
             # augment_bbox_landm.ProtectBoxes(),
             # augment_bbox.RandomRot90(),  # 随机横屏和竖屏
-            # augment_bbox_landm.RandomRotation(degrees=15),
+            augment_bbox_landm.RandomRotation(degrees=15),
             augment_bbox_landm.ProtectBoxes(norm=False),
             augment_bbox_landm.RandomHorizontalFlip(flip_index=flip_index),
             # augment_bbox_landm.RandomBoxesPaste(bg_dir=bg_dir),
@@ -175,6 +175,37 @@ class TestLandmsTransform:
             labels: labels of boxes.
         """
         return self.augment(img, boxes, labels, **kwargs)
+
+
+class DemoTransform:
+    def __init__(self, size, mean=0.0, std=1.0, norm=False):
+        if not (isinstance(size, list) or isinstance(size, tuple)):
+            size = (size, size)
+        bg_dir = "/home/dm/data3/dataset/finger_keypoint/finger/val/images"
+        self.transform = augment_bbox.Compose([
+            # augment_bbox.RandomRot90(),  # 随机横屏和竖屏
+            # augment_bbox.RandomRotation(degrees=15),
+            augment_bbox.ProtectBoxes(norm=False),
+            augment_bbox.RandomHorizontalFlip(),
+            # augment_bbox.RandomBoxesPaste(bg_dir=bg_dir),
+            augment_bbox.RandomMosaic(size, p=0.5),
+            # augment_bbox.RandomVerticalFlip(),
+            augment_bbox.RandomCrop(),
+            # augment_bbox.RandomCropLarge(min_size=self.size),
+            # augment_bbox.RandomContrastBrightness(),
+            # augment_bbox.ResizePadding(self.size),
+            # augment_bbox.ResizeRandomPadding(self.size, p=1.0),
+            augment_bbox.Resize(size),
+            augment_bbox.RandomColorJitter(),
+            augment_bbox.SwapChannels(),
+            augment_bbox.NormalizeBoxesCoords(),
+            augment_bbox.ProtectBoxes(norm=True),
+            augment_bbox.Normalize(mean=mean, std=std, norm=norm),
+            ToTensor(),
+        ])
+
+    def __call__(self, image, boxes, labels):
+        return self.transform(image, boxes, labels)
 
 
 class PredictionTransform:

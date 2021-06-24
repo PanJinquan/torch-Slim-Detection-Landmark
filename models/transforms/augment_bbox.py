@@ -48,7 +48,7 @@ def check_bboxes(boxes):
 
 
 class ProtectBoxes(object):
-    def __init__(self, norm=False, pct_th=0.01, iou_th=0.6):
+    def __init__(self, norm=False, pct_th=0.01, iou_th=0.65):
         """
         限制boxes边界范围，防止越界的情况，去除小框，避免出现Nan值
         :param norm: True：输入的boxes是归一化坐标，即boxes/[w,h,w,h]，范围(0,1)
@@ -68,7 +68,7 @@ class ProtectBoxes(object):
 
 
 class ClipBoxes(object):
-    def __init__(self, norm=False, iou_th=0.6):
+    def __init__(self, norm=False, iou_th=0.65):
         """
         用于限制boxes边界范围，防止越界的情况
         :param norm: True：输入的boxes是归一化坐标，即boxes/[w,h,w,h]，范围(0,1)
@@ -104,7 +104,7 @@ class ClipBoxes(object):
         iou = area / (s1 + s2 - area)
         return iou
 
-    def check_overlap(self, image, boxes, labels, cboxes, iou_th=0.6):
+    def check_overlap(self, image, boxes, labels, cboxes, iou_th):
         """
         检测clip前后的boxes的IOU变化，因此如果clip前后的IOU小于该阈值iou_th，box会被丢弃
         :param image:
@@ -301,21 +301,22 @@ class RandomResizePadding():
 
     def __call__(self, img, boxes, labels):
         if random.random() < self.p:
-            if random.random() < 0.5:
-                img, boxes, labels = self.resize_padding(img, boxes, labels)
-            else:
-                img, boxes, labels = self.resize(img, boxes, labels)
+            img, boxes, labels = self.resize_padding(img, boxes, labels)
+        else:
+            img, boxes, labels = self.resize(img, boxes, labels)
         return img, boxes, labels
 
 
 class RandomAffineResizePadding(object):
-    def __init__(self, output_size, degrees=15, check=False):
+    def __init__(self, degrees=15, output_size=None, p=0.5, check=True):
         """
         保持原始图像内容比，避免失真,短边会0填充，随机旋转进行仿生变换
-        :param output_size: 仿生变换输出的大小
+        PS：如果训练时加入“保持原始图像内容比”的数据增强，那测试也建议加上“保持原始图像内容比”
+        不然测试效果会差一点
         :param degrees:随机旋转的角度
-        :param check: True False:
-               使用ToPercentCoords()或ProtectBBoxes限制box越界情况
+        :param output_size: 仿生变换输出的大小
+        :param p: 仿生变换的概率P:
+        :param check: True False，检测使用ToPercentCoords()或ProtectBBoxes限制box越界情况
         """
         if isinstance(degrees, numbers.Number):
             if degrees < 0:
@@ -328,11 +329,17 @@ class RandomAffineResizePadding(object):
         self.output_size = output_size
         # 去除因为旋转导致越界的boxes
         self.check = check
+        self.p = p
         self.protect_bboxes = ProtectBoxes(norm=False)
+        if self.output_size:
+            self.size = Resize(self.output_size)
 
-    def affine(self, image, boxes, labels, angle):
+    def affine(self, image, boxes, labels, angle, output_size):
+        if not output_size:
+            h, w, _ = image.shape
+            output_size = [w, h]
         image, boxes, center, scale, kwargs = affine_transform.AffineTransform. \
-            affine_transform(image, boxes, self.output_size, rot=angle)
+            affine_transform(image, boxes, output_size, rot=angle)
         return image, boxes, labels
 
     def __call__(self, image, boxes, labels):
@@ -341,37 +348,18 @@ class RandomAffineResizePadding(object):
         :param boxes: np.array([[88, 176, 250, 312, 1222], [454, 115, 500, 291, 1222]]), 里面为x1, y1, x2, y2, 标签
         :return:
         '''
-        if len(boxes) > 0:
+        if random.random() < self.p and len(boxes) > 0:
             angle = random.uniform(self.degrees[0], self.degrees[1])
-            image, boxes, labels = self.affine(image, boxes, labels, angle)
+            image, boxes, labels = self.affine(image, boxes, labels, angle, self.output_size)
+        elif self.output_size:
+            image, boxes, labels = self.size(image, boxes, labels)
         # 去除因为旋转导致越界的boxes
         if self.check:
             image, boxes, labels = self.protect_bboxes(image, boxes, labels)
         return image, boxes, labels
 
-    def test_image(self, image, boxes, labels):
-        '''
-        :param image: nparray img
-        :param boxes: np.array([[88, 176, 250, 312, 1222], [454, 115, 500, 291, 1222]]), 里面为x1, y1, x2, y2, 标签
-        :param p: 随机比例
-        :return:
-        '''
-        from utils import image_processing
-        # 顺时针旋转90度
-        image_processing.show_image_boxes("src", image, boxes, waitKey=10)
-        for angle in range(360 * 10):
-            # angle = 30
-            trans_image, trans_boxes, trans_labels = self.affine(image, boxes, labels, angle)
-            # trans_image, trans_boxes, labels = self.rotation_v2(image, boxes, labels, angle)
-            trans_image, trans_boxes, trans_labels = self.protect_bboxes(trans_image, trans_boxes, trans_labels)
-            print("==" * 10)
-            print("angle:{}".format(angle))
-            print("shape:{},bboxes     ：{}".format(image.shape, boxes))
-            print("shape:{},trans_boxes：{},trans_labels:{}".format(trans_image.shape, trans_boxes, trans_labels))
-            trans_image = image_processing.draw_image_bboxes_text(trans_image, trans_boxes, trans_labels)
-            cv2.imshow("image", trans_image)
-            cv2.waitKey(0)
-        return image, boxes, labels
+    def set_degrees(self, degrees):
+        self.degrees = [degrees, degrees]
 
 
 class RandomBoxNoise(object):
@@ -419,7 +407,7 @@ class RandomExpand(object):
 
 
 class RandomCropLarge(object):
-    def __init__(self, min_size=[320, 320], p=0.8, iou_th=0.6):
+    def __init__(self, min_size=[320, 320], p=0.8):
         """
         RandomCropLarge与RandomCrop类似都是实现随机裁剪，
         RandomCrop会自定计算裁剪区域，为保证不会裁剪掉boxes的区域，其裁剪幅度较小
@@ -430,7 +418,7 @@ class RandomCropLarge(object):
         """
         self.p = p
         self.min_size = min_size
-        self.clip = ClipBoxes(norm=False, iou_th=iou_th)
+        self.clip = ClipBoxes(norm=False)
 
     def __call__(self, image, boxes, labels):
         if random.random() < self.p:
@@ -544,36 +532,14 @@ class RandomAffine(object):
             boxes[:, [1, 3]] = boxes[:, [1, 3]] + ty
         return img, boxes, labels
 
-    def test_image(self, image, input_boxes, classes):
-        '''
-        :param image: nparray img
-        :param boxes: np.array([[88, 176, 250, 312, 1222], [454, 115, 500, 291, 1222]]), 里面为x1, y1, x2, y2, 标签
-        :param p: 随机比例
-        :return:
-        '''
-        from utils import image_processing
-        # 顺时针旋转90度
-        for angle in range(480):
-            # angle = random.uniform(self.degrees[0], self.degrees[1])
-            num_boxes = len(input_boxes)
-            if num_boxes > 0:
-                dst_image, boxes, labels = self.__call__(image.copy(), input_boxes.copy(), classes)
-                dst_image = image_processing.draw_image_bboxes_text(dst_image, boxes, labels)
-                # dst_image = image_processing.draw_points_text(dst_image, [center], texts=["center"], drawType="simple")
-                # dst_image = image_processing.draw_landmark(dst_image, points, point_color=(255, 0, 0), vis_id=True)
-                cv2.imshow("image", dst_image)
-                cv2.waitKey(0)
-        return image, boxes, labels
-
 
 class RandomRotation(object):
-    def __init__(self, degrees=15, p=0.5, check=False):
+    def __init__(self, degrees=15, p=0.5, check=True):
         """
         随机旋转，BUG,loss出现inf,可能因为旋转导致部分box越界或者丢失
         :param degrees:
         :param p:随机旋转的概率
         :param check: True False:
-               使用ToPercentCoords()或ProtectBBoxes限制box越界情况
         """
         if isinstance(degrees, numbers.Number):
             if degrees < 0:
@@ -641,29 +607,8 @@ class RandomRotation(object):
                 image, boxes, labels = self.protect_bboxes(image, boxes, labels)
         return image, boxes, labels
 
-    def test_image(self, image, boxes, labels):
-        '''
-        :param image: nparray img
-        :param boxes: np.array([[88, 176, 250, 312, 1222], [454, 115, 500, 291, 1222]]), 里面为x1, y1, x2, y2, 标签
-        :param p: 随机比例
-        :return:
-        '''
-        from utils import image_processing
-        # 顺时针旋转90度
-        image_processing.show_image_boxes("src", image, boxes, waitKey=10)
-        for angle in range(360 * 10):
-            # angle = 30
-            trans_image, trans_boxes, trans_labels = self.rotation_v1(image, boxes, labels, angle)
-            # trans_image, trans_boxes, labels = self.rotation_v2(image, boxes, labels, angle)
-            trans_image, trans_boxes, trans_labels = self.protect_bboxes(trans_image, trans_boxes, trans_labels)
-            print("==" * 10)
-            print("angle:{}".format(angle))
-            print("shape:{},bboxes     ：{}".format(image.shape, boxes))
-            print("shape:{},trans_boxes：{},trans_labels:{}".format(trans_image.shape, trans_boxes, trans_labels))
-            trans_image = image_processing.draw_image_bboxes_text(trans_image, trans_boxes, trans_labels)
-            cv2.imshow("image", trans_image)
-            cv2.waitKey(0)
-        return image, boxes, labels
+    def set_degrees(self, degrees):
+        self.degrees = [degrees, degrees]
 
 
 class RandomRot90(object):
@@ -1033,6 +978,163 @@ class RandomOrientationModel():
         return img, boxes, labels
 
 
+class RandomMosaic(object):
+    def __init__(self, size, p=0.5, samples=[2, 3, 4], flip=True):
+        """
+        mosaic 数据增强
+        :param size: 返回图片的大小[width,height]
+        :param p: 随机概率
+        :param samples: Mosaic需要的图片数据量[2,3,4]
+                        2:使用2张图，随机进行上下拼接或者左右拼接
+                        3:使用3张图，进行拼接
+                        4:使用4张图，进行拼接
+        """
+        super(RandomMosaic, self).__init__()
+        self.size = size
+        self.p = p
+        if isinstance(samples, numbers.Number):
+            samples = [samples]
+        assert 5 > max(samples), Exception("samples:{}".format(samples))
+        assert 1 < min(samples), Exception("samples:{}".format(samples))
+        self.samples = samples
+        self.flip = flip
+        self.data = []
+        self.win_size = 3
+
+    def put_item(self, item):
+        """添加item(行)到队列表中"""
+        item = self.resize_item(item, size=self.size)
+        if len(self.data) >= self.win_size:
+            self.data.pop(0)
+        self.data.append(item)
+        for i in range(self.win_size - len(self.data)):
+            item = self.get_item(-1).copy()
+            self.data.append(item)
+
+    def get_item(self, row=-1):
+        """获取队列表中第index的item(行)数据"""
+        item = self.data[row]
+        return item
+
+    @staticmethod
+    def resize_item(item, size):
+        img, boxes, label = Resize(size=size)(item["img"], item["boxes"], item["label"])
+        item["img"] = img
+        item["boxes"] = boxes
+        item["label"] = label
+        return item
+
+    @staticmethod
+    def random_hflip(image, boxes, labels, p=0.5):
+        """随机水平翻转图片horizontal flip"""
+        if random.random() < p:
+            height, width, _ = image.shape
+            image = image[:, ::-1, :]
+            if len(boxes) > 0:
+                boxes[:, [0, 2]] = width - boxes[:, [2, 0]]
+        return image, boxes, labels
+
+    def mosaic_for2samples(self, item_list, size, p=0.5):
+        """需要二张图像进行拼接:item = {"img": img, "boxes": boxes, "label": label}"""
+        assert len(item_list) == 2
+        if random.random() < p:
+            # 左右拼接
+            item_list[0] = self.resize_item(item_list[0], size=[int(size[0] / 2), size[1]])
+            item_list[1] = self.resize_item(item_list[1], size=[int(size[0] / 2), size[1]])
+            h0, w0, d0 = item_list[0]["img"].shape
+            img_new = np.hstack((item_list[0]["img"], (item_list[1]["img"])))
+            boxes1 = item_list[1]["boxes"] + [w0, 0, w0, 0]
+        else:
+            # 上下拼接
+            item_list[0] = self.resize_item(item_list[0], size=[size[0], int(size[1] / 2)])
+            item_list[1] = self.resize_item(item_list[1], size=[size[0], int(size[1] / 2)])
+            h0, w0, d0 = item_list[0]["img"].shape
+            img_new = np.vstack((item_list[0]["img"], (item_list[1]["img"])))
+            boxes1 = item_list[1]["boxes"] + [0, h0, 0, h0]
+        dst_bboxes = np.vstack([item_list[0]["boxes"], boxes1])
+        dst_labels = np.hstack([item_list[0]["label"], item_list[1]["label"]])
+        item = {"img": img_new, "boxes": dst_bboxes, "label": dst_labels}
+        return item
+
+    def mosaic_for3samples(self, item_list, size):
+        """需要三张图像进行拼接:item = {"img": img, "boxes": boxes, "label": label}"""
+        assert len(item_list) == 3
+        item_list[0] = self.resize_item(item_list[0], size=[int(size[0] / 2), size[1]])
+        item_list[1] = self.resize_item(item_list[1], size=[int(size[0] / 2), int(size[1] / 2)])
+        item_list[2] = self.resize_item(item_list[2], size=[int(size[0] / 2), int(size[1] / 2)])
+        # 垂直方向拼接
+        img_12 = np.vstack((item_list[1]["img"], item_list[2]["img"]))
+        # 水平方向拼接
+        h0, w0, d0 = item_list[0]["img"].shape
+        img_new = np.hstack((item_list[0]["img"], img_12))
+        boxes1 = item_list[1]["boxes"] + [w0, 0, w0, 0]
+        boxes2 = item_list[2]["boxes"] + [w0, int(h0 / 2), w0, int(h0 / 2)]
+        dst_bboxes = np.vstack([item_list[0]["boxes"], boxes1, boxes2])
+        dst_labels = np.hstack([item_list[0]["label"], item_list[1]["label"],
+                                item_list[2]["label"]])
+        item = {"img": img_new, "boxes": dst_bboxes, "label": dst_labels}
+        return item
+
+    def mosaic_for4samples(self, item_list, size=None):
+        """需要四张图像进行拼接:item = {"img": img, "boxes": boxes, "label": label}"""
+        assert len(item_list) == 4
+        item_list[0] = self.resize_item(item_list[0], size=[int(size[0] / 2), int(size[1] / 2)])
+        item_list[1] = self.resize_item(item_list[1], size=[int(size[0] / 2), int(size[1] / 2)])
+        item_list[2] = self.resize_item(item_list[2], size=[int(size[0] / 2), int(size[1] / 2)])
+        item_list[3] = self.resize_item(item_list[3], size=[int(size[0] / 2), int(size[1] / 2)])
+        # 水平方向拼接
+        img_01 = np.hstack((item_list[0]["img"], item_list[1]["img"]))
+        img_23 = np.hstack((item_list[2]["img"], item_list[3]["img"]))
+        # 垂直方向拼接
+        img_new = np.vstack((img_01, img_23))
+        h0, w0, d0 = item_list[0]["img"].shape
+        boxes1 = item_list[1]["boxes"] + [w0, 0, w0, 0]
+        boxes2 = item_list[2]["boxes"] + [0, h0, 0, h0]
+        boxes3 = item_list[3]["boxes"] + [w0, h0, w0, h0]
+        dst_bboxes = np.vstack([item_list[0]["boxes"], boxes1, boxes2, boxes3])
+        dst_labels = np.hstack([item_list[0]["label"], item_list[1]["label"],
+                                item_list[2]["label"], item_list[3]["label"]])
+        item = {"img": img_new, "boxes": dst_bboxes, "label": dst_labels}
+        return item
+
+    def mosaic(self, item0, samples):
+        if samples == 2:
+            item1 = self.get_item(-1).copy()
+            item_list = [item0, item1]
+            out_item = self.mosaic_for2samples(item_list, size=self.size)
+        elif samples == 3:
+            item1 = self.get_item(-1).copy()
+            item2 = self.get_item(-2).copy()
+            item_list = [item0, item1, item2]
+            out_item = self.mosaic_for3samples(item_list, size=self.size)
+        elif samples == 4:
+            item1 = self.get_item(-1).copy()
+            item2 = self.get_item(-2).copy()
+            item3 = self.get_item(-3).copy()
+            item_list = [item0, item1, item2, item3]
+            out_item = self.mosaic_for4samples(item_list, size=self.size)
+        else:
+            raise Exception("Error:samples:{}".format(self.samples))
+        return out_item
+
+    def __call__(self, img, boxes, label):
+        item = {"img": img, "boxes": boxes, "label": label}
+        if len(boxes) > 0:
+            # 随机保留训练图片，用于mosaic
+            if random.random() < 0.1 or len(self.data) == 0:
+                self.put_item(item)
+
+            # 随机生成mosaic图片
+            if random.random() < self.p:
+                samples = np.random.choice(self.samples)
+                out_item = self.mosaic(item, samples)
+                img, boxes, label = out_item["img"], out_item["boxes"], out_item["label"]
+                if self.flip:
+                    img, boxes, label = self.random_hflip(img, boxes, label)
+        boxes = np.asarray(boxes, dtype=np.float32)
+        return img, boxes, label
+
+
 class RandomBoxesPaste(object):
     """ 实现随机背景贴图"""
 
@@ -1251,55 +1353,74 @@ def show_image(image, bboxes, labels, normal=False, transpose=False):
         bboxes = bboxes * bboxes_scale
     # tmp_image = image_processing.untranspose(tmp_image)
     tmp_image = image_processing.convert_color_space(image, colorSpace="BGR")
-    image_processing.show_image_boxes("train", tmp_image, bboxes)
+    tmp_image = image_processing.draw_image_bboxes_text(tmp_image, bboxes, labels)
+    image_processing.cv_show_image("train", tmp_image)
 
 
-def demo_for_bboxes():
+def demo_for_augment():
     from utils import image_processing
+    bg_dir = "/home/dm/data3/dataset/finger_keypoint/bug/JPEGImages"
     input_size = [320, 320]
     image_path = "test.jpg"
-    src_boxes = [[200, 222, 439, 500], [98, 42, 160, 100], [244, 260, 297, 332]]
-    # src_boxes = [[-1, -1, 300, 300], [300, 300, 400, 700]]
-    classes = [1, 2, 3]
-    # augment = RandomCrop(p=1.0,margin_rate=0.5)
-    augment = SwapChannels()
-    # augment = RandomCropLarge(p=1.0, min_size=input_size)
-    # augment = ResizePadding(size=input_size)
-    # augment = IgnoreBadBBoxes()
-    # augment = RandomBoxesPaste(p=1.0)
-    # augment = RandomOrientationModel()
-    # augment = RandomBoxNoise()
-    # augment = RandomColorJitter()
-    src_image = image_processing.read_image(image_path)
-    src_boxes = np.asarray(src_boxes)
-    src_classes = np.asarray(classes)
+    boxes = [[98, 42, 160, 100], [244, 260, 297, 332], [98 + 50, 42 + 50, 160 + 50, 100 + 50]]
+    labels = [1, 2, 3]
+    image = image_processing.read_image(image_path)
+    boxes = np.asarray(boxes)
+    labels = np.asarray(labels)
+    augment = Compose([
+        # augment_bbox_landm.ProtectBoxes(),
+        # augment_bbox.RandomRot90(),  # 随机横屏和竖屏
+        # RandomRotation(degrees=15),
+        ProtectBoxes(norm=False),
+        # RandomHorizontalFlip(flip_index=flip_index),
+        # RandomBoxesPaste(bg_dir=bg_dir),
+        # RandomVerticalFlip(),
+        # RandomCrop(),
+        # RandomCropLarge(min_size=input_size),
+        # RandomContrastBrightness(),
+        RandomAffineResizePadding(degrees=15, output_size=input_size),
+        RandomMosaic(size=input_size),
+        # RandomAffineResizePadding(degrees=15),
+        # ResizePadding(input_size),
+        # RandomResizePadding(input_size, p=0.5),
+        # Resize(input_size),
+        # ResizePadding(input_size),
+        RandomColorJitter(),
+        # SwapChannels(),
+    ])
+
     for i in range(1000):
         print("===" * 10)
-        dst_image, dst_boxes, classes = augment(src_image.copy(), src_boxes.copy(), src_classes.copy())
-        show_image(dst_image, dst_boxes, classes, normal=False, transpose=False)
+        dst_image, dst_boxes, dst_labels = augment(image.copy(), boxes.copy(), labels.copy())
+        show_image(dst_image, dst_boxes, dst_labels, normal=False, transpose=False)
 
 
-def demo_RandomRotation():
+def demo_for_rotation():
     from utils import image_processing
-
     input_size = [320, 320]
     image_path = "test.jpg"
-    # src_boxes = [[8.20251, 1, 242.2412, 699.2236],
-    #              [201.14865, 204.18265, 468.605, 696.36163], [100, 100, 150, 150]]
-    src_boxes = [[98, 42, 160, 100], [98 + 50, 42 + 50, 160 + 50, 100 + 50], [244, 260, 297, 332], [124, 126, 125, 135]]
+    images = image_processing.read_image(image_path)
+    bboxes = [[98, 42, 160, 100], [98 + 50, 42 + 50, 160 + 50, 100 + 50], [244, 260, 297, 332], [124, 126, 125, 135]]
+    labels = np.asarray([1, 2, 3, 4])
+    bboxes = np.asarray(bboxes)
 
-    classes = np.asarray([1, 2, 3, 4])
-    # src_boxes=[]
-    # classes=[]
-    # augment = RandomRotation(degrees=15)
-    augment = RandomAffineResizePadding(input_size, degrees=15)
+    # augment = RandomRotation(degrees=15, p=1.0)
+    augment = RandomAffineResizePadding(degrees=15, output_size=input_size, p=1.0)
     # augment = RandomAffine()
-    # src_image = image_processing.read_image(image_path, resize_height=800, resize_width=800)
-    src_image = image_processing.read_image(image_path)
-    src_boxes = np.asarray(src_boxes)
-    dst_image, boxes, classes = augment.test_image(src_image.copy(), src_boxes.copy(), classes)
+    augment = RandomMosaic(size=input_size, p=0.9, samples=[2, 3, 4])
+    # 顺时针旋转90度
+    # image_processing.show_image_boxes("src", images, bboxes, color=(0, 255, 0), waitKey=10)
+    for angle in range(360 * 10):
+        # angle = 30
+        # augment.set_degrees(angle)
+        dst_image, dst_boxes, dst_labels = augment(images.copy(), bboxes.copy(), labels.copy())
+        print("==" * 10)
+        print("angle:{}".format(angle))
+        print("shape:{},bboxes     ：{}".format(bboxes.shape, bboxes))
+        print("dst_image:{},dst_boxes：{},dst_labels:{}".format(dst_image.shape, dst_boxes, dst_labels))
+        show_image(dst_image, dst_boxes, dst_labels, normal=False, transpose=False)
 
 
 if __name__ == "__main__":
-    # demo_for_bboxes()
-    demo_RandomRotation()
+    # demo_for_augment()
+    demo_for_rotation()

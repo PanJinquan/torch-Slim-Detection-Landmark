@@ -563,8 +563,8 @@ if __name__ == "__main__":
     # image_id_list = file_processing.get_files_id(anno_list)
     size = [320, 320]
     # transform = data_transforms.TrainAugmentation(size, mean=0.0, std=1.0)
-    transform = data_transforms.TrainTransform(size, mean=0.0, std=1.0, norm=True)
-    # transform = data_transforms.DemoTransform(size, mean=0.0, std=1.0)
+    # transform = data_transforms.TrainTransform(size, mean=0.0, std=1.0, norm=True)
+    transform = data_transforms.DemoTransform(size, mean=0.0, std=1.0, norm=True)
     voc = VOCDataset(filename=filenames,
                      data_root=None,
                      anno_dir=anno_dir,
@@ -577,5 +577,6 @@ if __name__ == "__main__":
     print("have num:{}".format(len(voc)))
     for i in range(len(voc)):
         print(i)
-        image, bboxes, labels = voc.__getitem__(i)
+        image, target = voc.__getitem__(i)
+        bboxes, labels = target[:, 0:4], target[:, 4:5]
         show_boxes_image(image, bboxes, labels, normal=True, transpose=True)

@@ -38,7 +38,7 @@ class Compose(object):
 
 
 class ProtectBoxes(augment_bbox.ProtectBoxes):
-    def __init__(self, norm=False, pct_th=0.01, iou_th=0.6):
+    def __init__(self, norm=False, pct_th=0.01, iou_th=0.65):
         """
         限制boxes边界范围，防止越界的情况，去除小框，避免出现Nan值
         :param norm: True：输入的boxes是归一化坐标，即boxes/[w,h,w,h]，范围(0,1)
@@ -58,7 +58,7 @@ class ProtectBoxes(augment_bbox.ProtectBoxes):
 
 
 class ClipBoxes(augment_bbox.ClipBoxes):
-    def __init__(self, norm=False, iou_th=0.6):
+    def __init__(self, norm=False, iou_th=0.65):
         """
         用于限制boxes边界范围，防止越界的情况
         :param norm: True：输入的boxes是归一化坐标，即boxes/[w,h,w,h]，范围(0,1)
@@ -69,7 +69,7 @@ class ClipBoxes(augment_bbox.ClipBoxes):
         self.iou_th = iou_th
         self.index = []
 
-    def check_overlap(self, image, boxes, labels, cboxes, iou_th=0.6, **kwargs):
+    def check_overlap(self, image, boxes, labels, cboxes, iou_th, **kwargs):
         """
         检测clip前后的boxes的IOU变化，因此如果clip前后的IOU小于该阈值iou_th，box会被丢弃
         :param image:
@@ -298,7 +298,7 @@ class ResizePadding(object):
         return image, boxes, labels, kwargs
 
 
-class RandomResizePadding():
+class RandomResizePadding(augment_bbox.RandomResizePadding):
     def __init__(self, size, p=0.5):
         """
         随机使用ResizePadding和Resize，以提高泛化性
@@ -310,21 +310,22 @@ class RandomResizePadding():
 
     def __call__(self, img, boxes, labels, **kwargs):
         if random.random() < self.p:
-            if random.random() < 0.5:
-                img, boxes, labels, kwargs = self.resize_padding(img, boxes, labels, **kwargs)
-            else:
-                img, boxes, labels, kwargs = self.resize(img, boxes, labels, **kwargs)
+            img, boxes, labels, kwargs = self.resize_padding(img, boxes, labels, **kwargs)
+        else:
+            img, boxes, labels, kwargs = self.resize(img, boxes, labels, **kwargs)
         return img, boxes, labels, kwargs
 
 
 class RandomAffineResizePadding(augment_bbox.RandomAffineResizePadding):
-    def __init__(self, output_size, degrees=15, check=False):
+    def __init__(self, degrees=15, output_size=None, p=0.5, check=True):
         """
         保持原始图像内容比，避免失真,短边会0填充，随机旋转进行仿生变换
-        :param output_size: 仿生变换输出的大小
+        PS：如果训练时加入“保持原始图像内容比”的数据增强，那测试也建议加上“保持原始图像内容比”
+        不然测试效果会差一点
         :param degrees:随机旋转的角度
-        :param check: True False:
-               使用ToPercentCoords()或ProtectBBoxes限制box越界情况
+        :param output_size: 仿生变换输出的大小
+        :param p: 仿生变换的概率P:
+        :param check: True False，检测使用ToPercentCoords()或ProtectBBoxes限制box越界情况
         """
         if isinstance(degrees, numbers.Number):
             if degrees < 0:
@@ -337,11 +338,17 @@ class RandomAffineResizePadding(augment_bbox.RandomAffineResizePadding):
         self.output_size = output_size
         # 去除因为旋转导致越界的boxes
         self.check = check
+        self.p = p
         self.protect_bboxes = ProtectBoxes(norm=False)
+        if self.output_size:
+            self.size = Resize(self.output_size)
 
-    def affine(self, image, boxes, labels, angle, **kwargs):
+    def affine(self, image, boxes, labels, angle, output_size, **kwargs):
+        if not output_size:
+            h, w, _ = image.shape
+            output_size = [w, h]
         image, boxes, center, scale, kwargs = affine_transform.AffineTransform. \
-            affine_transform(image, boxes, self.output_size, rot=angle, **kwargs)
+            affine_transform(image, boxes, output_size, rot=angle, **kwargs)
         return image, boxes, labels, kwargs
 
     def __call__(self, image, boxes, labels, **kwargs):
@@ -351,45 +358,15 @@ class RandomAffineResizePadding(augment_bbox.RandomAffineResizePadding):
         :param p: 随机比例
         :return:
         '''
-        if len(boxes) > 0:
+        if random.random() < self.p and len(boxes) > 0:
             angle = random.uniform(self.degrees[0], self.degrees[1])
-            image, boxes, labels, kwargs = self.affine(image, boxes, labels, angle, **kwargs)
+            image, boxes, labels, kwargs = self.affine(image, boxes, labels, angle, self.output_size, **kwargs)
+        elif self.output_size:
+            image, boxes, labels, kwargs = self.size(image, boxes, labels, **kwargs)
         # 去除因为旋转导致越界的boxes
         if self.check:
             image, boxes, labels, kwargs = self.protect_bboxes(image, boxes, labels, **kwargs)
         return image, boxes, labels, kwargs
-
-    def test_image(self, image, boxes, labels, land_mark):
-        '''
-        :param image: nparray img
-        :param boxes: np.array([[88, 176, 250, 312, 1222], [454, 115, 500, 291, 1222]]), 里面为x1, y1, x2, y2, 标签
-        :param p: 随机比例
-        :return:
-        '''
-        from utils import image_processing
-        # 顺时针旋转90度
-        image_processing.show_image_boxes("src", image, boxes, waitKey=10, color=(0, 255, 0))
-        for angle in range(360 * 10):
-            # angle = 25
-            trans_image, trans_boxes, trans_labels, trans_kwargs = self.affine(image.copy(),
-                                                                               boxes.copy(),
-                                                                               labels.copy(),
-                                                                               angle,
-                                                                               land_mark=land_mark.copy())
-            trans_image, trans_boxes, trans_labels, trans_kwargs = self.protect_bboxes(trans_image, trans_boxes,
-                                                                                       trans_labels,
-                                                                                       **trans_kwargs)
-            print("==" * 10)
-            print("angle:{}".format(angle))
-            print("shape:{},bboxes     ：{}".format(image.shape, boxes))
-            print("shape:{},trans_boxes：{},trans_labels:{}".format(trans_image.shape, trans_boxes, trans_labels))
-            trans_land_mark = trans_kwargs["land_mark"]
-            trans_land_mark = trans_land_mark.reshape(-1, 5, 2)
-            trans_image = image_processing.draw_landmark(trans_image, trans_land_mark, vis_id=True)
-            # trans_image = image_processing.draw_image_bboxes_text(trans_image, trans_boxes, trans_labels)
-            cv2.imshow("image", trans_image)
-            cv2.waitKey(0)
-        return image, boxes, labels
 
 
 class RandomBoxNoise(augment_bbox.RandomBoxNoise):
@@ -421,18 +398,17 @@ class RandomBoxNoise(augment_bbox.RandomBoxNoise):
 
 
 class RandomCropLarge(augment_bbox.RandomCropLarge):
-    def __init__(self, min_size=[320, 320], p=0.8, iou_th=0.6):
+    def __init__(self, min_size=[320, 320], p=0.8):
         """
         RandomCropLarge与RandomCrop类似都是实现随机裁剪，
         RandomCrop会自定计算裁剪区域，为保证不会裁剪掉boxes的区域，其裁剪幅度较小
         RandomCropLarge可设定最小裁剪区域min_size，裁剪幅度较大，可能会裁剪部分box区域
         :param min_size: 最小crop的大小[W,H]
         :param p:概率P
-        :param iou_th: clip会缩小boxes，因此如果clip前后的IOU小于该阈值，box会被丢弃
         """
         self.p = p
         self.min_size = min_size
-        self.clip = ClipBoxes(norm=False, iou_th=iou_th)
+        self.clip = ClipBoxes(norm=False)
 
     def __call__(self, image, boxes, labels, **kwargs):
         if random.random() < self.p:
@@ -517,10 +493,16 @@ class RandomCrop(object):
         return img, boxes, labels, kwargs
 
 
-class RandomRotation(object):
+class RandomRotation(augment_bbox.RandomRotation):
     """ 随机旋转"""
 
-    def __init__(self, degrees, p=0.5):
+    def __init__(self, degrees=15, p=0.5, check=True):
+        """
+        随机旋转，BUG,loss出现inf,可能因为旋转导致部分box越界或者丢失
+        :param degrees:
+        :param p:随机旋转的概率
+        :param check: True False:
+        """
         if isinstance(degrees, numbers.Number):
             if degrees < 0:
                 raise ValueError("If degrees is a single number, it must be positive.")
@@ -530,6 +512,9 @@ class RandomRotation(object):
                 raise ValueError("If degrees is a sequence, it must be of len 2.")
             self.degrees = degrees
         self.p = p
+        # 去除因为旋转导致越界的boxes
+        self.check = check
+        self.protect_bboxes = ProtectBoxes(norm=False)
 
     def __call__(self, image, boxes, labels, **kwargs):
         '''
@@ -538,7 +523,6 @@ class RandomRotation(object):
         :param p: 随机比例
         :return:
         '''
-        from utils import image_processing
         # 顺时针旋转90度
         if random.random() < self.p and len(boxes) > 0:
             angle = random.uniform(self.degrees[0], self.degrees[1])
@@ -557,6 +541,9 @@ class RandomRotation(object):
                     points = kwargs[k].reshape(-1, 2)
                     points = affine_transform.rotate_points(points, centers=[center], angle=angle, height=h)
                     kwargs[k] = points.reshape(num_boxes, -1)
+        # 去除因为旋转导致越界的boxes
+        if self.check:
+            image, boxes, labels, kwargs = self.protect_bboxes(image, boxes, labels, **kwargs)
         return image, boxes, labels, kwargs
 
 
@@ -655,6 +642,11 @@ class RandomVerticalFlip(augment_bbox.RandomVerticalFlip):
         return self.__class__.__name__ + '(p={})'.format(self.p)
 
 
+class RandomMosaic(augment_bbox.RandomMosaic):
+    def __init__(self, size=None, p=0.5, samples=[2, 3, 4], flip=True):
+        pass
+
+
 class SwapChannels(augment_bbox.SwapChannels):
     """交换图像颜色通道的顺序"""
 
@@ -662,7 +654,7 @@ class SwapChannels(augment_bbox.SwapChannels):
         """
         由于输入可能是RGB或者BGR格式的图像，随机交换通道顺序可以避免图像通道顺序的影响
         :param swaps:指定交换的颜色通道顺序，如[2,1,0]
-                     如果swaps=[]或None，表示随机交换顺序
+                     如果swaps=[]或None，表示随机交换顺序RGB或者BGR
         :param p:概率
         """
         self.p = p
@@ -716,7 +708,7 @@ def show_landmark_image(image, bboxes, landms, labels, normal=False, transpose=F
     bboxes = np.asarray(bboxes)
     landms = np.asarray(landms)
     labels = np.asarray(labels)
-    print("image:{}".format(image.shape))
+    print("image :{}".format(image.shape))
     print("bboxes:{}".format(bboxes))
     print("landms:{}".format(landms))
     print("labels:{}".format(labels))
@@ -733,13 +725,15 @@ def show_landmark_image(image, bboxes, landms, labels, normal=False, transpose=F
     # tmp_image = image_processing.untranspose(tmp_image)
     tmp_image = image_processing.convert_color_space(image, colorSpace="BGR")
     tmp_image = image_processing.draw_landmark(tmp_image, landms, vis_id=True)
-    image_processing.show_image_boxes("train", tmp_image, bboxes)
+    # image_processing.show_image_boxes("train", tmp_image, bboxes)
+    tmp_image = image_processing.draw_image_bboxes_text(tmp_image, bboxes, labels)
+    image_processing.cv_show_image("train", tmp_image)
 
 
-def demo_for_landmark():
+def demo_for_augment():
     from utils import image_processing
     image_path = "test.jpg"
-    src_boxes = [[98, 42, 160, 100], [244, 260, 297, 332]]
+    bboxes = [[98, 42, 160, 100], [244, 260, 297, 332]]
     land_mark = [[[122.44442, 54.193676],
                   [147.6293, 56.77364],
                   [135.35794, 74.66961],
@@ -752,46 +746,53 @@ def demo_for_landmark():
                   [286.5602, 313.99652]]]
     classes = [1, 1]
     input_size = [480, 480]
-    src_image = image_processing.read_image(image_path)
-    src_boxes = np.asarray(src_boxes, dtype=np.float32)
-    src_classes = np.asarray(classes, dtype=np.int32)
-    src_land_mark = np.asarray(land_mark).reshape(-1, 10)
+    images = image_processing.read_image(image_path)
+    bboxes = np.asarray(bboxes, dtype=np.float32)
+    labels = np.asarray(classes, dtype=np.int32)
+    land_mark = np.asarray(land_mark).reshape(-1, 10)
     flip_index = [2, 3, 0, 1, 4, 5, 8, 9, 6, 7]
     # augment = RandomCrop(p=0.5, margin_rate=0.3)
     # augment = RandomCropLarge(min_size=[320, 320], p=1.0)
     augment = Compose([
+        # augment_bbox_landm.ProtectBoxes(),
         # augment_bbox.RandomRot90(),  # 随机横屏和竖屏
         # RandomRotation(degrees=15),
         ProtectBoxes(norm=False),
-        RandomHorizontalFlip(flip_index=flip_index),
-        # augment_bbox.RandomBoxesPaste(bg_dir=bg_dir),
-        # augment_bbox.RandomVerticalFlip(),
+        # RandomHorizontalFlip(flip_index=flip_index),
+        # RandomBoxesPaste(bg_dir=bg_dir),
+        # RandomVerticalFlip(),
         # RandomCrop(),
-        # augment_bbox.RandomCropLarge(),
-        # augment_bbox.RandomContrastBrightness(),
-        # augment_bbox.ResizePadding(self.size),
-        # RandomResizePadding(input_size, p=1.0),
+        # RandomCropLarge(min_size=input_size),
+        # RandomContrastBrightness(),
+        RandomAffineResizePadding(degrees=15, output_size=input_size),
+        # RandomAffineResizePadding(degrees=15),
+        # ResizePadding(input_size),
+        # RandomResizePadding(input_size, p=0.5),
         # Resize(input_size),
-        RandomAffineResizePadding(input_size, degrees=15),
+        # ResizePadding(input_size),
         RandomColorJitter(),
+        # SwapChannels(),
     ])
 
     for i in range(1000):
         print("===" * 10)
-        dst_image, boxes, classes, kwargs = augment(src_image,
-                                                    src_boxes.copy(),
-                                                    src_classes.copy(),
-                                                    land_mark=src_land_mark.copy())
-        height, width, depth = dst_image.shape
-        land_mark = kwargs["land_mark"]
-        land_mark = land_mark.reshape(-1, 5, 2)
-        show_landmark_image(dst_image, boxes, land_mark, classes, normal=False, transpose=False)
+        dst_image, dst_boxes, dst_labels, dst_kwargs = augment(images,
+                                                               bboxes.copy(),
+                                                               labels.copy(),
+                                                               land_mark=land_mark.copy())
+        dst_land_mark = dst_kwargs["land_mark"]
+        dst_land_mark = dst_land_mark.reshape(-1, 5, 2)
+        show_landmark_image(dst_image, dst_boxes, dst_land_mark, dst_labels, normal=False, transpose=False)
 
 
-def demo_for_augment():
+def demo_for_rotation():
     from utils import image_processing
+    input_size = [320, 320]
     image_path = "test.jpg"
-    src_boxes = [[98, 42, 160, 100], [244, 260, 297, 332]]
+    images = image_processing.read_image(image_path)
+    bboxes = [[98, 42, 160, 100], [244, 260, 297, 332]]
+    labels = [1, 2]
+    flip_index = [2, 3, 0, 1, 4, 5, 8, 9, 6, 7]
     land_mark = [[[122.44442, 54.193676],
                   [147.6293, 56.77364],
                   [135.35794, 74.66961],
@@ -802,20 +803,26 @@ def demo_for_augment():
                   [268.39877, 306.3493],
                   [265.5242, 318.80936],
                   [286.5602, 313.99652]]]
-    classes = [1, 1]
-    input_size = [320, 640]
-    src_image = image_processing.read_image(image_path)
-    src_boxes = np.asarray(src_boxes, dtype=np.float32)
-    src_classes = np.asarray(classes, dtype=np.int32)
-    src_land_mark = np.asarray(land_mark).reshape(-1, 10)
-    flip_index = [2, 3, 0, 1, 4, 5, 8, 9, 6, 7]
-    augment = RandomAffineResizePadding(input_size, degrees=15)
-    augment.test_image(src_image,
-                       src_boxes,
-                       src_classes,
-                       land_mark=src_land_mark)
+    bboxes = np.asarray(bboxes, dtype=np.float32)
+    labels = np.asarray(labels, dtype=np.int32)
+    land_mark = np.asarray(land_mark).reshape(-1, 10)
+
+    augment = RandomAffineResizePadding(degrees=15, output_size=None, p=0.5)
+    augment = RandomRotation(degrees=15, p=1.0)
+    # 顺时针旋转90度
+    image_processing.show_image_boxes("src", images, bboxes, waitKey=10, color=(0, 255, 0))
+    for angle in range(360 * 10):
+        augment.set_degrees(angle)
+        dst_image, dst_boxes, dst_labels, dst_kwargs = augment(images.copy(),
+                                                               bboxes.copy(),
+                                                               labels.copy(),
+                                                               land_mark=land_mark.copy())
+        print("==" * 10)
+        dst_land_mark = dst_kwargs["land_mark"]
+        dst_land_mark = dst_land_mark.reshape(-1, 5, 2)
+        show_landmark_image(dst_image, dst_boxes, dst_land_mark, dst_labels, normal=False, transpose=False)
 
 
 if __name__ == "__main__":
-    #     demo_for_landmark()
-    demo_for_augment()
+    # demo_for_augment()
+    demo_for_rotation()
