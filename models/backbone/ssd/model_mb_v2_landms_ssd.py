@@ -2,7 +2,7 @@ import torch
 from torch.nn import Conv2d, Sequential, ModuleList, BatchNorm2d
 from torch import nn
 from ..nn.mobilenet_v2.mobilenet_v2 import MobileNetV2, InvertedResidual
-from ..ssd.ssd import SSD, GraphPath
+from ..ssd.ssd_landms import SSDLandmark
 from torch.nn import Conv2d, Sequential, ModuleList, ReLU
 
 
@@ -19,7 +19,7 @@ def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=
     )
 
 
-def create_mobilenetv2_ssd_lite(prior_boxes, num_classes, is_test=False, width_mult=1.0, device="cuda:0"):
+def create_mobilenetv2_landm_ssd(prior_boxes, num_classes, is_test=False, width_mult=1.0, device="cuda:0"):
     """
     <class 'list'>: [[24, 12, 6, 3], [24, 12, 6, 3]]
     "shrinkage": [8, 16, 32, 64],
@@ -32,10 +32,11 @@ def create_mobilenetv2_ssd_lite(prior_boxes, num_classes, is_test=False, width_m
     """
     base_net = MobileNetV2(width_mult=width_mult, use_batch_norm=True, onnx_compatible=False)
     base_net_model = base_net.features
-    # GraphPath must import from SSD
-    # source_layer_indexes = [GraphPath(11, 'conv', 2), 15, ]  # source_layer_indexes = [8, 16, 19]
+    # GraphPath must import from SSDLandmark
+    # feature_index = [GraphPath(11, 'conv', 2), 15, ]  # feature_index = [8, 16, 19]
     source_layer_indexes = [7, 11, 17]
-    channels = [32, 64, 160, base_net.last_channel]
+    # channels = [32, 64, 160, backbone.last_channel]
+    channels = [int(32 * width_mult), int(64 * width_mult), int(160 * width_mult), base_net.last_channel]
     extras = ModuleList([
         Sequential(
             Conv2d(in_channels=channels[3], out_channels=channels[2], kernel_size=1),
@@ -82,6 +83,26 @@ def create_mobilenetv2_ssd_lite(prior_boxes, num_classes, is_test=False, width_m
                out_channels=boxes_expand[3] * num_classes,
                kernel_size=3,
                padding=1)])
-    return SSD(num_classes, base_net_model, source_layer_indexes,
-               extras, classification_headers, regression_headers, is_test=is_test, prior_boxes=prior_boxes,
-               device=device)
+
+    landms_headers = ModuleList([
+        SeperableConv2d(in_channels=channels[0],
+                        out_channels=boxes_expand[0] * 10,
+                        kernel_size=3,
+                        padding=1),
+        SeperableConv2d(in_channels=channels[1],
+                        out_channels=boxes_expand[1] * 10,
+                        kernel_size=3,
+                        padding=1),
+        SeperableConv2d(in_channels=channels[2],
+                        out_channels=boxes_expand[2] * 10,
+                        kernel_size=3,
+                        padding=1),
+        Conv2d(in_channels=channels[3],
+               out_channels=boxes_expand[3] * 10,
+               kernel_size=3,
+               padding=1)])
+
+    return SSDLandmark(num_classes, base_net_model, source_layer_indexes,
+                       extras, classification_headers, regression_headers, landms_headers, is_test=is_test,
+                       prior_boxes=prior_boxes,
+                       device=device)

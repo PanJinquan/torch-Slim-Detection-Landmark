@@ -39,7 +39,7 @@ OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 python3 -u train.py \
     --lr 0.1 \
     --milestones "60,100,150" \
     --save_folder $save_folder \
-    --flag  "v4"\
+    --flag  "v2_ssd"\
     --check \
 #    --resume "work_space/RFB_landms/rfb1.0_face_320_320_wider_face_add_lm_10_10_anchor_v4_20210329174602/model/best_model_rfb_160_loss6.6319.pth"
 

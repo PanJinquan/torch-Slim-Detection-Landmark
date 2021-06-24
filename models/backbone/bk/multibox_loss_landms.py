@@ -7,7 +7,7 @@ from models.anchor_utils import box_utils
 
 class MultiBoxLossLandm(nn.Module):
     def __init__(self, priors, neg_pos_ratio, center_variance, size_variance, device):
-        """Implement SSD Multibox Loss.
+        """Implement SSDLandmark Multibox Loss.
 
         Basically, Multibox loss combines classification loss
          and Smooth L1 regression loss.

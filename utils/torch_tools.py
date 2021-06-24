@@ -44,9 +44,9 @@ def freeze_net_layers(net):
     """
     https://www.zhihu.com/question/311095447/answer/589307812
     example:
-        freeze_net_layers(net.base_net)
+        freeze_net_layers(net.backbone)
         freeze_net_layers(net.source_layer_add_ons)
-        freeze_net_layers(net.extras)
+        freeze_net_layers(net.extra_layer)
     :param net:
     :return:
     """

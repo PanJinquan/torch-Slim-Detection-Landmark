@@ -5,15 +5,18 @@ import torch.nn.functional as F
 
 class BasicConv(nn.Module):
 
-    def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True, bn=True):
+    def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True,
+                 bn=True):
         super(BasicConv, self).__init__()
         self.out_channels = out_planes
         if bn:
-            self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=False)
+            self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding,
+                                  dilation=dilation, groups=groups, bias=False)
             self.bn = nn.BatchNorm2d(out_planes, eps=1e-5, momentum=0.01, affine=True)
             self.relu = nn.ReLU(inplace=True) if relu else None
         else:
-            self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=True)
+            self.conv = nn.Conv2d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding,
+                                  dilation=dilation, groups=groups, bias=True)
             self.bn = None
             self.relu = nn.ReLU(inplace=True) if relu else None
 
@@ -47,18 +50,22 @@ class BasicRFB(nn.Module):
         self.branch0 = nn.Sequential(
             BasicConv(in_planes, inter_planes, kernel_size=1, stride=1, groups=groups, relu=False),
             BasicConv(inter_planes, 2 * inter_planes, kernel_size=(3, 3), stride=stride, padding=(1, 1), groups=groups),
-            BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=vision + 1, dilation=vision + 1, relu=False, groups=groups)
+            BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=vision + 1,
+                      dilation=vision + 1, relu=False, groups=groups)
         )
         self.branch1 = nn.Sequential(
             BasicConv(in_planes, inter_planes, kernel_size=1, stride=1, groups=groups, relu=False),
             BasicConv(inter_planes, 2 * inter_planes, kernel_size=(3, 3), stride=stride, padding=(1, 1), groups=groups),
-            BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=vision + 2, dilation=vision + 2, relu=False, groups=groups)
+            BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=vision + 2,
+                      dilation=vision + 2, relu=False, groups=groups)
         )
         self.branch2 = nn.Sequential(
             BasicConv(in_planes, inter_planes, kernel_size=1, stride=1, groups=groups, relu=False),
             BasicConv(inter_planes, (inter_planes // 2) * 3, kernel_size=3, stride=1, padding=1, groups=groups),
-            BasicConv((inter_planes // 2) * 3, 2 * inter_planes, kernel_size=3, stride=stride, padding=1, groups=groups),
-            BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=vision + 4, dilation=vision + 4, relu=False, groups=groups)
+            BasicConv((inter_planes // 2) * 3, 2 * inter_planes, kernel_size=3, stride=stride, padding=1,
+                      groups=groups),
+            BasicConv(2 * inter_planes, 2 * inter_planes, kernel_size=3, stride=1, padding=vision + 4,
+                      dilation=vision + 4, relu=False, groups=groups)
         )
 
         self.ConvLinear = BasicConv(6 * inter_planes, out_planes, kernel_size=1, stride=1, relu=False)
@@ -81,9 +88,9 @@ class BasicRFB(nn.Module):
 
 class Mb_Tiny_RFB(nn.Module):
 
-    def __init__(self, num_classes=2,width_mult=1.0):
+    def __init__(self, num_classes=2, width_mult=1.0):
         super(Mb_Tiny_RFB, self).__init__()
-        self.base_channel = int(8 * 2*width_mult)
+        self.base_channel = int(8 * 2 * width_mult)
 
         def conv_bn(inp, oup, stride):
             return nn.Sequential(
@@ -104,19 +111,19 @@ class Mb_Tiny_RFB(nn.Module):
             )
 
         self.model = nn.Sequential(
-            conv_bn(3, self.base_channel, 2),  # 160*120
-            conv_dw(self.base_channel, self.base_channel * 2, 1),
-            conv_dw(self.base_channel * 2, self.base_channel * 2, 2),  # 80*60
-            conv_dw(self.base_channel * 2, self.base_channel * 2, 1),
-            conv_dw(self.base_channel * 2, self.base_channel * 4, 2),  # 40*30
-            conv_dw(self.base_channel * 4, self.base_channel * 4, 1),
-            conv_dw(self.base_channel * 4, self.base_channel * 4, 1),
-            BasicRFB(self.base_channel * 4, self.base_channel * 4, stride=1, scale=1.0),
-            conv_dw(self.base_channel * 4, self.base_channel * 8, 2),  # 20*15
-            conv_dw(self.base_channel * 8, self.base_channel * 8, 1),
-            conv_dw(self.base_channel * 8, self.base_channel * 8, 1),
-            conv_dw(self.base_channel * 8, self.base_channel * 16, 2),  # 10*8
-            conv_dw(self.base_channel * 16, self.base_channel * 16, 1)
+            conv_bn(3, self.base_channel, 2),  # conv_bn1(3, 16, 2)
+            conv_dw(self.base_channel, self.base_channel * 2, 1),  # conv_dw2(16, 32, 1)
+            conv_dw(self.base_channel * 2, self.base_channel * 2, 2),  # conv_dw3(32, 32, 2)
+            conv_dw(self.base_channel * 2, self.base_channel * 2, 1),  # conv_dw4(32, 32, 1)
+            conv_dw(self.base_channel * 2, self.base_channel * 4, 2),  # conv_dw5(32, 64, 2)
+            conv_dw(self.base_channel * 4, self.base_channel * 4, 1),  # conv_dw6(64, 64, 1)
+            conv_dw(self.base_channel * 4, self.base_channel * 4, 1),  # conv_dw7(64, 64, 1)
+            BasicRFB(self.base_channel * 4, self.base_channel * 4, stride=1, scale=1.0),  #8 (64, 64, 1, 1.0)
+            conv_dw(self.base_channel * 4, self.base_channel * 8, 2),  # conv_dw9(64, 128, 2)
+            conv_dw(self.base_channel * 8, self.base_channel * 8, 1),  # conv_dw10(128, 128, 1)
+            conv_dw(self.base_channel * 8, self.base_channel * 8, 1),  # conv_dw11(128, 128, 1)
+            conv_dw(self.base_channel * 8, self.base_channel * 16, 2),  # conv_dw12(128, 256, 2)
+            conv_dw(self.base_channel * 16, self.base_channel * 16, 1)  # conv_dw13(256, 256, 1)
         )
         self.fc = nn.Linear(1024, num_classes)
 

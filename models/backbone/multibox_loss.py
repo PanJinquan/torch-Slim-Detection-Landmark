@@ -5,7 +5,7 @@ from ..anchor_utils.anchor_utils import matrix_iof, match_landms, log_sum_exp, m
 
 
 class MultiBoxLandmLoss(nn.Module):
-    """SSD Weighted Loss Function
+    """SSDLandmark Weighted Loss Function
     Compute Targets:
         1) Produce Confidence Target Indices by matching  ground truth boxes
            with (default) 'priorboxes' that have jaccard index > threshold parameter
@@ -45,7 +45,7 @@ class MultiBoxLandmLoss(nn.Module):
         """Multibox Loss
         Args:
             predictions (tuple): A tuple containing loc preds, conf preds,
-            and prior boxes from SSD net.
+            and prior boxes from SSDLandmark net.
                 conf shape: torch.size(batch_size,num_priors,num_classes)
                 loc shape: torch.size(batch_size,num_priors,4)
                 priors shape: torch.size(num_priors,4)
@@ -125,7 +125,7 @@ class MultiBoxLandmLoss(nn.Module):
 
 
 class MultiBoxLoss(nn.Module):
-    """SSD Weighted Loss Function
+    """SSDLandmark Weighted Loss Function
     Compute Targets:
         1) Produce Confidence Target Indices by matching  ground truth boxes
            with (default) 'priorboxes' that have jaccard index > threshold parameter
@@ -165,7 +165,7 @@ class MultiBoxLoss(nn.Module):
         """Multibox Loss
         Args:
             predictions (tuple): A tuple containing loc preds, conf preds,
-            and prior boxes from SSD net.
+            and prior boxes from SSDLandmark net.
                 conf shape: torch.size(batch_size,num_priors,num_classes)
                 loc shape: torch.size(batch_size,num_priors,4)
                 priors shape: torch.size(num_priors,4)

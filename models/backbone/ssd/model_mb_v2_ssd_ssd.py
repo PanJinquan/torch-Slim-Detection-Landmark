@@ -1,48 +1,46 @@
-# -*-coding: utf-8 -*-
-"""
-    @Author : panjq
-    @E-mail : pan_jinquan@163.com
-    @Date   : 2019-02-14 15:34:50
-"""
-
+import torch
+from torch.nn import Conv2d, Sequential, ModuleList, BatchNorm2d
+from torch import nn
+from ..nn.mobilenet_v2.mobilenet_v2 import MobileNetV2, InvertedResidual
+from ..ssd.ssd import SSD
 from torch.nn import Conv2d, Sequential, ModuleList, ReLU
-from models.backbone.nn.mb_tiny_RFB import Mb_Tiny_RFB
-from models.backbone.ssd.ssd import SSD
 
 
-def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0):
+def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0, onnx_compatible=False):
     """Replace Conv2d with a depthwise Conv2d and Pointwise Conv2d.
     """
+    ReLU = nn.ReLU if onnx_compatible else nn.ReLU6
     return Sequential(
         Conv2d(in_channels=in_channels, out_channels=in_channels, kernel_size=kernel_size,
                groups=in_channels, stride=stride, padding=padding),
+        BatchNorm2d(in_channels),
         ReLU(),
         Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1),
     )
 
 
-def create_mb_tiny_rfb_fd(prior_boxes, num_classes, is_test=False, width_mult=1.0, device="cuda:0"):
+def create_mobilenetv2_ssd(prior_boxes, num_classes, is_test=False, width_mult=1.0, device="cuda:0"):
     """
-    create_Mb_Tiny_RFB_fd_predictor
-    min_sizes = [[10, 16, 24], [32, 48], [64, 96], [128, 192, 256]]  # for Face
-    x=torch.Size([24, 64, 30, 40]), location:torch.Size([24, 12, 30, 40])location-view:torch.Size([24, 3600, 4])
-    x=torch.Size([24, 128, 15, 20]),location:torch.Size([24, 8, 15, 20]) location-view:torch.Size([24, 600, 4])
-    x=torch.Size([24, 256, 8, 10]), location:torch.Size([24, 8, 8, 10])  location-view:torch.Size([24, 160, 4])
-    x=torch.Size([24, 256, 4, 5]),  location:torch.Size([24, 12, 4, 5])  location-view:torch.Size([24, 60, 4])
+    <class 'list'>: [[24, 12, 6, 3], [24, 12, 6, 3]]
+    "shrinkage": [8, 16, 32, 64],
+    index=7,c=192
+    :param prior_boxes:
     :param num_classes:
     :param is_test:
     :param device:
     :return:
     """
-    base_net = Mb_Tiny_RFB(num_classes,width_mult)
-    base_net_model = base_net.model  # disable dropout layer
-
-    source_layer_indexes = [8, 11, 17]
+    base_net = MobileNetV2(width_mult=width_mult, use_batch_norm=True, onnx_compatible=False)
+    base_net_model = base_net.features
+    # GraphPath must import from SSDLandmark
+    # feature_index = [GraphPath(11, 'conv', 2), 15, ]  # feature_index = [8, 16, 19]
+    source_layer_indexes = [7, 11, 17]
+    channels = [32, 64, 160, base_net.last_channel]
     extras = ModuleList([
         Sequential(
-            Conv2d(in_channels=base_net.base_channel * 16, out_channels=base_net.base_channel * 4, kernel_size=1),
+            Conv2d(in_channels=channels[3], out_channels=channels[2], kernel_size=1),
             ReLU(),
-            SeperableConv2d(in_channels=base_net.base_channel * 4, out_channels=base_net.base_channel * 16,
+            SeperableConv2d(in_channels=channels[2], out_channels=channels[3],
                             kernel_size=3, stride=2, padding=1),
             ReLU()
         )
@@ -50,41 +48,40 @@ def create_mb_tiny_rfb_fd(prior_boxes, num_classes, is_test=False, width_mult=1.
 
     boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_sizes]
     regression_headers = ModuleList([
-        SeperableConv2d(in_channels=base_net.base_channel * 4,
+        SeperableConv2d(in_channels=channels[0],
                         out_channels=boxes_expand[0] * 4,
                         kernel_size=3,
                         padding=1),
-        SeperableConv2d(in_channels=base_net.base_channel * 8,
+        SeperableConv2d(in_channels=channels[1],
                         out_channels=boxes_expand[1] * 4,
                         kernel_size=3,
                         padding=1),
-        SeperableConv2d(in_channels=base_net.base_channel * 16,
+        SeperableConv2d(in_channels=channels[2],
                         out_channels=boxes_expand[2] * 4,
                         kernel_size=3,
                         padding=1),
-        Conv2d(in_channels=base_net.base_channel * 16,
+        Conv2d(in_channels=channels[3],
                out_channels=boxes_expand[3] * 4,
                kernel_size=3,
                padding=1)])
 
     classification_headers = ModuleList([
-        SeperableConv2d(in_channels=base_net.base_channel * 4,
+        SeperableConv2d(in_channels=channels[0],
                         out_channels=boxes_expand[0] * num_classes,
                         kernel_size=3,
                         padding=1),
-        SeperableConv2d(in_channels=base_net.base_channel * 8,
+        SeperableConv2d(in_channels=channels[1],
                         out_channels=boxes_expand[1] * num_classes,
                         kernel_size=3,
                         padding=1),
-        SeperableConv2d(in_channels=base_net.base_channel * 16,
+        SeperableConv2d(in_channels=channels[2],
                         out_channels=boxes_expand[2] * num_classes,
                         kernel_size=3,
                         padding=1),
-        Conv2d(in_channels=base_net.base_channel * 16,
+        Conv2d(in_channels=channels[3],
                out_channels=boxes_expand[3] * num_classes,
                kernel_size=3,
                padding=1)])
-
     return SSD(num_classes, base_net_model, source_layer_indexes,
                extras, classification_headers, regression_headers, is_test=is_test, prior_boxes=prior_boxes,
                device=device)

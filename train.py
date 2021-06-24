@@ -146,7 +146,7 @@ class Trainer(object):
         self.logging.info("priors_type:{}".format(self.priors_type))
         self.logging.info("priors nums:{}".format(len(self.priors)))
 
-    def build_net(self, net_type, priors_type, version="v1"):
+    def build_net(self, net_type, priors_type, version="v2"):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type)
         if version.lower() == "v1".lower():
             net = nets.build_net_v1(net_type, priorbox, width_mult=self.width_mult, phase='train', device=self.device)

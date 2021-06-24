@@ -1,6 +1,6 @@
 # -*-coding: utf-8 -*-
 """
-    @Project: Pytorch-SSD
+    @Project: Pytorch-SSDLandmark
     @File   : ssd_detector.py
     @Author : panjq
     @E-mail : pan_jinquan@163.com

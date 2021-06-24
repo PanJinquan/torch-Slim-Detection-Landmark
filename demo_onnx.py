@@ -20,7 +20,7 @@ import torch
 import numpy as np
 import demo
 from models import onnx_detector
-from models.backbone.layers.functions import PriorBox
+from models.anchor_utils.prior_box import PriorBox
 from utils import debug
 
 

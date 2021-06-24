@@ -6,8 +6,8 @@
 """
 
 from torch.nn import Conv2d, Sequential, ModuleList, ReLU
-from ..nn.mb_tiny_RFB import Mb_Tiny_RFB
-from ..ssd.ssd_landms import SSD
+from ..nn.model_mb_tiny import Mb_Tiny
+from ..ssd.ssd import SSD
 
 
 def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=0):
@@ -20,21 +20,8 @@ def SeperableConv2d(in_channels, out_channels, kernel_size=1, stride=1, padding=
         Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=1),
     )
 
-
-def create_mb_tiny_rfb_landms(prior_boxes, num_classes, is_test=False, width_mult=1.0, device="cuda:0"):
-    """
-    create_Mb_Tiny_RFB_fd_predictor
-    min_sizes = [[10, 16, 24], [32, 48], [64, 96], [128, 192, 256]]  # for Face
-    x=torch.Size([24, 64, 30, 40]), location:torch.Size([24, 12, 30, 40])location-view:torch.Size([24, 3600, 4])
-    x=torch.Size([24, 128, 15, 20]),location:torch.Size([24, 8, 15, 20]) location-view:torch.Size([24, 600, 4])
-    x=torch.Size([24, 256, 8, 10]), location:torch.Size([24, 8, 8, 10])  location-view:torch.Size([24, 160, 4])
-    x=torch.Size([24, 256, 4, 5]),  location:torch.Size([24, 12, 4, 5])  location-view:torch.Size([24, 60, 4])
-    :param num_classes:
-    :param is_test:
-    :param device:
-    :return:
-    """
-    base_net = Mb_Tiny_RFB(num_classes)
+def create_model_slim_ssd(prior_boxes, num_classes, is_test=False, width_mult=1.0, device="cuda:0"):
+    base_net = Mb_Tiny(num_classes)
     base_net_model = base_net.model  # disable dropout layer
 
     source_layer_indexes = [8, 11, 13]
@@ -47,8 +34,8 @@ def create_mb_tiny_rfb_landms(prior_boxes, num_classes, is_test=False, width_mul
             ReLU()
         )
     ])
-
     boxes_expand = [len(boxes) * (len(prior_boxes.aspect_ratios)) for boxes in prior_boxes.min_sizes]
+
     regression_headers = ModuleList([
         SeperableConv2d(in_channels=base_net.base_channel * 4,
                         out_channels=boxes_expand[0] * 4,
@@ -65,7 +52,8 @@ def create_mb_tiny_rfb_landms(prior_boxes, num_classes, is_test=False, width_mul
         Conv2d(in_channels=base_net.base_channel * 16,
                out_channels=boxes_expand[3] * 4,
                kernel_size=3,
-               padding=1)])
+               padding=1)
+    ])
 
     classification_headers = ModuleList([
         SeperableConv2d(in_channels=base_net.base_channel * 4,
@@ -83,27 +71,9 @@ def create_mb_tiny_rfb_landms(prior_boxes, num_classes, is_test=False, width_mul
         Conv2d(in_channels=base_net.base_channel * 16,
                out_channels=boxes_expand[3] * num_classes,
                kernel_size=3,
-               padding=1)])
-
-    landms_headers = ModuleList([
-        SeperableConv2d(in_channels=base_net.base_channel * 4,
-                        out_channels=boxes_expand[0] * 10,
-                        kernel_size=3,
-                        padding=1),
-        SeperableConv2d(in_channels=base_net.base_channel * 8,
-                        out_channels=boxes_expand[1] * 10,
-                        kernel_size=3,
-                        padding=1),
-        SeperableConv2d(in_channels=base_net.base_channel * 16,
-                        out_channels=boxes_expand[2] * 10,
-                        kernel_size=3,
-                        padding=1),
-        Conv2d(in_channels=base_net.base_channel * 16,
-               out_channels=boxes_expand[3] * 10,
-               kernel_size=3,
-               padding=1)])
+               padding=1)
+    ])
 
     return SSD(num_classes, base_net_model, source_layer_indexes,
-               extras, classification_headers, regression_headers, landms_headers,is_test=is_test, prior_boxes=prior_boxes,
+               extras, classification_headers, regression_headers, is_test=is_test, prior_boxes=prior_boxes,
                device=device)
-

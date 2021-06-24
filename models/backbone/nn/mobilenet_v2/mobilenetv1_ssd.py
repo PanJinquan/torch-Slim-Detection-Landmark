@@ -14,7 +14,7 @@ def create_mobilenetv1_ssd(num_classes, is_test=False):
         14,
     ]
 
-    # extras modules :https://blog.csdn.net/happyday_d/article/details/86021569
+    # extra_layer modules :https://blog.csdn.net/happyday_d/article/details/86021569
     extras = ModuleList([
         Sequential(
             Conv2d(in_channels=1024, out_channels=256, kernel_size=1),
@@ -60,7 +60,7 @@ def create_mobilenetv1_ssd(num_classes, is_test=False):
         Conv2d(in_channels=256, out_channels=6 * num_classes, kernel_size=3, padding=1), # TODO: change to kernel_size=1, padding=0?
     ])
 
-    # SSD return (confidence, locations)
+    # SSDLandmark return (confidence, locations)
     return SSD(num_classes, base_net, source_layer_indexes,
                extras, classification_headers, regression_headers, is_test=is_test, config=config)
 
