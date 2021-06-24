@@ -1,169 +1,46 @@
-# Face-Detector-1MB-with-landmark
-## 实现功能
- - Retinaface-mobile0.25的训练/测试/评估/ncnn C++推理
- - Face-Detector-1MB slim和RFB版本的训练/测试/评估/ncnn C++推理
- - 人脸5个关键点检测
- - 支持onnx导出
- - 网络parameter和flop计算
-# 带有关键点检测的超轻量级人脸检测器
+# sphinx+gitlab+readthedocs文档托管步骤
 
-提供了一系列适合移动端部署包含关键的人脸检测器: 对[Retinaface-mobile0.25](https://github.com/biubug6/Pytorch_Retinaface)修改anchor尺寸,使其更适合边缘计算; 重新实现了[Face-Detector-1MB](https://github.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB) 并添加了关键点检测和ncnn C++部署功能, 在绝大部分情况下精度均好于原始版本.
-<p align="center"><img src="data/img/1.jpg"\></p>
+## 1.安装sphinx
+- 在ubuntu本地环境安装sphinx: 
+        
+      sudo apt install python3-sphinx
+  
+- 在python虚拟环境安装: 
+      
+      pip install sphinx 或: conda install sphinx
 
-## 测试的运行环境
-- Ubuntu18.04
-- Python3.7
-- Pytorch1.2
-- CUDA10.0 + CUDNN7.5
+## 2.sphinx使用方法
 
-## 精度
-### Widerface测试
+- 在文件目录执行: 
 
- - 在wider face val精度（单尺度输入分辨率：**320*240**）
- 
- 方法|Easy|Medium|Hard
-------|--------|----------|--------
-libfacedetection v1（caffe）|0.65 |0.5       |0.233
-libfacedetection v2（caffe）|0.714 |0.585       |0.306
-version-slim(原版)|0.765     |0.662       |0.385
-version-RFB(原版)|0.784     |0.688       |**0.418**
-version-slim(our)|0.795     |0.683       |0.34.5
-version-RFB(our)|**0.814**     |**0.710**       |0.363
-Retinaface-Mobilenet-0.25(our)  |0.811|0.697|0.376
+      sphinx-quickstart
 
-- 在wider face val精度（单尺度输入分辨率：**640*480**） 
+- 执行后需要对配置做选择, 可以全部默认, 后续可以在生成的conf.py做修改
+- 执行后生成一份主页文档index.rst, 可以通过index.rst对其他文件做索引, 组合成一个文档比如
+![lena](./assets/sphinx_1.png)
+  
+- 生成文档格式:
+![lena](./assets/sphinx_3.png)
+  
+- 含中文的表格文档编写可以用pycharm的等宽字体, 方便表格对齐
+![lena](./assets/sphinx_4.png)
+  
+- rst标记语言编写参考: https://3vshej.cn/rstSyntax/index.html
+- 也可以在原有项目基础上直接修改文档信息，主要修改的文件：`specification.rst`,`overview.rst`,`index.rst`,`conf.py`和`interface.rst`
 
-方法|Easy|Medium|Hard 
-------|--------|----------|--------
-libfacedetection v1（caffe）|0.741 |0.683       |0.421
-libfacedetection v2（caffe）|0.773 |0.718       |0.485
-version-slim(原版)|0.757     |0.721       |0.511
-version-RFB(原版)|0.851     |0.81       |0.541
-version-slim(our)|0.850     |0.808       |0.595
-version-RFB(our)|0.865    |0.828       |0.622
-Retinaface-Mobilenet-0.25(our)  |**0.873**|**0.836**|**0.638**
+## 3.生成文档
+- 在Makefile目录下执行: 
+  
+      make html 或者 bash build
 
-ps: 测试的时候,长边为320 或者 640 ,图像等比例缩放.
+- 执行后生成的目录结构如图: 
+![lena](./assets/sphinx_5.png)
+- 直接点击index.html就可以在浏览器看到文档
 
-## Parameter and flop
+## 4.readthedocs文档托管
+- 上面sphinx生成的文档需要通过点击index.html才可以看到文档, 而且只能在本地看, 去到其他终端就需要把文件拷贝一份才能看。 
+- 可以通过文档托管解决这个问题.
+- 托管步骤
 
-方法|parameter(M)|flop(M) 
-------|--------|----------
-version-slim(our)|0.343     |98.793
-version-RFB(our)|0.359    |118.435
-Retinaface-Mobilenet-0.25(our)  |0.426|193.921
-
-ps: 320*240作为输入
-
-
-### Contents
-- [Installation](#installation)
-- [Training](#training)
-- [Evaluation](#evaluation)
-- [C++_inference _ncnn](#c++_inference_ncnn)
-- [References](#references)
-
-## Installation
-##### Clone and install
-1. git clone https://github.com/biubug6/Face-Detector-1MB-with-landmark.git
-
-2. Pytorch version 1.1.0+ and torchvision 0.3.0+ are needed.
-
-3. Codes are based on Python 3
-
-##### Data
-1. The dataset directory as follows:
-
-```Shell
-  ./data/widerface/
-    train/
-      images/
-      label.txt
-    val/
-      images/
-      wider_val.txt
-```
-ps: wider_val.txt only include val file names but not label information.
-
-2. We provide the organized dataset we used as in the above directory structure.
-
-Link: from [google cloud](https://drive.google.com/open?id=11UGV3nbVv1x9IC--_tK3Uxf7hA6rlbsS) or [baidu cloud](https://pan.baidu.com/s/1jIp9t30oYivrAvrgUgIoLQ) Password: ruck
-
-## Training
-
-1. Before training, you can check network configuration (e.g. batch_size, min_sizes and steps etc..) in ``data/config.py and train.py``.
-
-2. Train the model using WIDER FACE:
-  ```Shell
-  CUDA_VISIBLE_DEVICES=0 python train.py --network mobile0.25 or 
-  CUDA_VISIBLE_DEVICES=0 python train.py --network slim or
-  CUDA_VISIBLE_DEVICES=0 python train.py --network RFB
-  ```
-
-If you don't want to train, we also provide a trained model on ./weights
-  ```Shell
-  mobilenet0.25_Final.pth 
-  RBF_Final.pth
-  slim_Final.pth
-  ```
-## Evaluation
-### Evaluation widerface val
-1. Generate txt file
-```Shell
-python test_widerface.py --trained_model weight_file --network mobile0.25 or slim or RFB
-```
-2. Evaluate txt results. Demo come from [Here](https://github.com/wondervictor/WiderFace-Evaluation)
-```Shell
-cd ./widerface_evaluate
-python setup.py build_ext --inplace
-python evaluation.py
-```
-3. You can also use widerface official Matlab evaluate demo in [Here](http://mmlab.ie.cuhk.edu.hk/projects/WIDERFace/WiderFace_Results.html)
-
-## C++_inference _ncnn
-1. Generate onnx file
-```Shell
-python convert_to_onnx.py --trained_model weight_file --network mobile0.25 or slim or RFB
-```
-2. Onnx file change to ncnn(*.param and *.param)
-```Shell
-cp *.onnx ./Face_Detector_ncnn/tools
-cd ./Face_Detector_ncnn/tools
-./onnx2ncnn face.param face.bin
-```
-3. Move *.param and *.bin to model
-```Shell
-cp face.param ../model
-cp face.bin ../model
-```
-4. Build Project(set opencv path in CmakeList.txt)
-```Shell
-mkdir build
-cd build
-cmake ..
-make -j4
-```
-5. run
-```Shell
-./FaceDetector *.jpg
-```
-
-We also provide the converted file in "./model".
-```Shell
-face.param
-face.bin
-```
-
-
-## References
-- [FaceBoxes](https://github.com/zisianw/FaceBoxes.PyTorch)
-- [Retinaface (mxnet)](https://github.com/deepinsight/insightface/tree/master/RetinaFace)
-- [Retinaface (pytorch)](https://github.com/biubug6/Pytorch_Retinaface)
-- [Ultra-Light-Fast-Generic-Face-Detector-1MB](https://github.com/Linzaer/Ultra-Light-Fast-Generic-Face-Detector-1MB)
-```
-@inproceedings{deng2019retinaface,
-title={RetinaFace: Single-stage Dense Face Localisation in the Wild},
-author={Deng, Jiankang and Guo, Jia and Yuxiang, Zhou and Jinke Yu and Irene Kotsia and Zafeiriou, Stefanos},
-booktitle={arxiv},
-year={2019}
-```
+      1.把源码上传到github或者gitlab, 不需要上传make html生成的文件, 网站会自动构建, 注意项目要是公开项目
+      2.在https://readthedocs.org/ 导入github或者gitlab上的项目就可以通过一个url查看到文档了
