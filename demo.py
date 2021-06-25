@@ -106,7 +106,7 @@ class Detector(object):
         :return:
         """
         state_dict = torch_tools.load_state_dict(model_path, module=False)
-        # model.load_state_dict(state_dict)
+        model.load_state_dict(state_dict)
         model = model.to(self.device)
         model.eval()
         return model
