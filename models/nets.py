@@ -15,9 +15,9 @@ from models.backbone.ssd.model_mb_v2_landms_ssd import create_mobilenetv2_landm_
 
 
 def build_net_v1(net_type: str, prior_boxes, width_mult=1.0, phase='train', device="cuda:0"):
-    if net_type.lower() == "mobile0.25_landm".lower():
+    if net_type.lower() == "mnet_landm".lower():
         # prior_cfg = mnet_face_config
-        net = RetinaFaceLandm(cfg=prior_boxes.prior_cfg, phase=phase)
+        net = RetinaFaceLandm(prior_boxes=prior_boxes, phase=phase)
     elif net_type.lower() == "slim_landm".lower():
         net = SlimLandm(prior_boxes=prior_boxes, phase=phase)
     elif net_type.lower() == "RFB_landm".lower():

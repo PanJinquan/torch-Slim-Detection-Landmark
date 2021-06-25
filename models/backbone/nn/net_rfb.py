@@ -227,8 +227,7 @@ class RFB(nn.Module):
         self.num_classes = prior_boxes.num_classes
         self.aspect_ratios = prior_boxes.aspect_ratios
         self.min_sizes = prior_boxes.min_sizes
-        # [3,2,2,3]
-        self.boxes_expand = [len(boxes) * (len(self.aspect_ratios)) for boxes in self.min_sizes]
+        self.boxes_expand = [len(boxes) * (len(self.aspect_ratios)) for boxes in self.min_sizes]  # [3,2,2,3]
 
         self.conv1 = conv_bn(3, 16, 2)
         self.conv2 = conv_dw(16, 32, 1)

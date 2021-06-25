@@ -32,6 +32,7 @@ def get_parser():
     # model_path ="work_space/rfb_ldmks_face_320_320.pth"
     net_type = "rfb"
     priors_type = "face_person"
+
     parser = argparse.ArgumentParser(description='Face Detection Test')
     parser.add_argument('-m', '--model_path', default=model_path, type=str, help='model file path')
     parser.add_argument('--net_type', default=net_type, help='Backbone network mobile0.25 or slim or RFB')
@@ -105,7 +106,7 @@ class Detector(object):
         :return:
         """
         state_dict = torch_tools.load_state_dict(model_path, module=False)
-        model.load_state_dict(state_dict)
+        # model.load_state_dict(state_dict)
         model = model.to(self.device)
         model.eval()
         return model

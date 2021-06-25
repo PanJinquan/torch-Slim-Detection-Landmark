@@ -25,9 +25,14 @@ from utils import debug
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    model_path = "work_space/best_model_RFB_landm_116_loss7.3498.pth"
+    model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_dmai_data_FDDB_v2_ssd_20210624145405/model/best_model_RFB_landm_183_loss7.6508.pth"
     net_type = "rfb_landm"
     priors_type = "face"
+
+    image_dir = "data/test_image"
+    model_path = "/home/dm/data3/FaceDetector/torch-Slim-Detection-Landmark/data/weights/v0.0/mobilenet0.25_Final.pth"
+    net_type = "mnet_landm"
+    priors_type = "mnet_face"
     parser = argparse.ArgumentParser(description='Face Detection Test')
     parser.add_argument('-m', '--model_path', default=model_path, type=str, help='model file path')
     parser.add_argument('--net_type', default=net_type, help='Backbone network mobile0.25 or slim or RFB')
@@ -46,8 +51,27 @@ def get_parser():
 
 
 class Detector(demo.Detector):
+    def __init__(self,
+                 model_path,
+                 net_type="RFB",
+                 priors_type="face",
+                 input_size=[320, 320],
+                 prob_threshold=0.6,
+                 iou_threshold=0.4,
+                 freeze_header=False,
+                 top_k=5000,
+                 keep_top_k=750,
+                 device="cpu"
+                 ):
+        super(Detector, self).__init__(model_path,
+                                       net_type=net_type,
+                                       priors_type=priors_type,
+                                       input_size=input_size,
+                                       prob_threshold=prob_threshold,
+                                       iou_threshold=iou_threshold,
+                                       freeze_header=freeze_header)
 
-    def build_net(self, net_type, priors_type, version="v2"):
+    def build_net(self, net_type, priors_type, version="v1"):
         return super().build_net(net_type, priors_type, version)
 
     @debug.run_time_decorator("post_process")

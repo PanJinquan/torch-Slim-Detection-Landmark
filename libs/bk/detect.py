@@ -130,7 +130,7 @@ if __name__ == '__main__':
         loc, conf, landms = net(img)  # forward pass
         print('net forward time: {:.4f}'.format(time.time() - tic))
 
-        # priorbox = PriorBox(cfg, input_size=(im_height, im_width))
+        # priorbox = PriorBox(prior_cfg, input_size=(im_height, im_width))
         # priors = priorbox.forward()
         prior_boxes = PriorBox(input_size, priors_type=args.priors_type)
         priors=prior_boxes.priors

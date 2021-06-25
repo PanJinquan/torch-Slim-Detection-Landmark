@@ -75,7 +75,7 @@ class MNNDetector(demo.Detector):
     def build_net(self, cfg, net_type, model_path):
         """
         :param net_type: <dict> mobile0.25,slim or RFB
-        :return:net,cfg,prior_data
+        :return:net,prior_cfg,prior_data
         """
         interpreter = MNN.Interpreter(model_path)
         session = interpreter.createSession()

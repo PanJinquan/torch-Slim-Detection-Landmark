@@ -3,7 +3,7 @@ import numpy as np
 
 
 def point_form(boxes):
-    """ Convert prior_boxes to (xmin, ymin, xmax, ymax)
+    """ Convert prior_cfg to (xmin, ymin, xmax, ymax)
     representation for comparison to point form ground truth data.
     Args:
         boxes: (tensor) center-size default boxes from priorbox layers.
@@ -15,7 +15,7 @@ def point_form(boxes):
 
 
 def center_size(boxes):
-    """ Convert prior_boxes to (cx, cy, w, h)
+    """ Convert prior_cfg to (cx, cy, w, h)
     representation for comparison to center-size form ground truth data.
     Args:
         boxes: (tensor) point_form boxes

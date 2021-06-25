@@ -43,7 +43,7 @@ def get_parser():
     train_path = "/home/dm/data3/dataset/face_person/MPII/test.txt"
     val_path = "/home/dm/data3/dataset/face_person/MPII/test.txt"
     data_type = "VOC"
-    priors_type = "face_person"
+    priors_type = "mnet_face_config"
     batch_size = 8
     train_path = [train_path]
     val_path = [val_path]
@@ -134,8 +134,8 @@ class Trainer(object):
         self.net, self.prior_boxes = self.build_net(self.net_type, self.priors_type)
         self.priors_cfg = self.prior_boxes.get_prior_cfg()
         self.priors = self.prior_boxes.priors.to(self.device)
-        # self.class_names = self.prior_boxes.class_names
-        # self.num_classes = self.prior_boxes.num_classes
+        # self.class_names = self.prior_cfg.class_names
+        # self.num_classes = self.prior_cfg.num_classes
         self.rgb_mean = self.prior_boxes.image_mean  # bgr order
         self.rgb_std = self.prior_boxes.image_std  # bgr order
         self.class_names = self.prior_boxes.class_names
