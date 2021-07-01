@@ -42,8 +42,6 @@ def get_parser():
     parser.add_argument('--image_dir', default=image_dir, type=str, help='directory or image path')
     parser.add_argument('--input_size', nargs='+', help="--input size [600(W),600(H)]", type=int, default=input_size)
     parser.add_argument('--num_classes', help="num_classes", type=int, default=2)
-    parser.add_argument('--top_k', default=5000, type=int, help='top_k')
-    parser.add_argument('--keep_top_k', default=750, type=int, help='keep_top_k')
     parser.add_argument('--device', default="cuda:0", type=str, help='device')
     args = parser.parse_args()
     print(args)
@@ -59,8 +57,6 @@ class Detector(object):
                  prob_threshold=0.6,
                  iou_threshold=0.4,
                  freeze_header=True,
-                 top_k=5000,
-                 keep_top_k=750,
                  device="cpu"):
         """
         :param model_path:
@@ -69,8 +65,6 @@ class Detector(object):
         :param network: Backbone network mobile0.25 or slim or RFB
         :param prob_threshold: confidence_threshold
         :param iou_threshold: nms_threshold
-        :param top_k:
-        :param keep_top_k:
         :param device:
         """
         self.device = device
@@ -78,11 +72,10 @@ class Detector(object):
         self.priors_type = priors_type
         self.prob_threshold = prob_threshold
         self.iou_threshold = iou_threshold
-        self.top_k = top_k
-        self.keep_top_k = keep_top_k
+        self.top_k = 5000
+        self.keep_top_k = 750
         self.input_size = input_size
         self.freeze_header = freeze_header
-
         self.net, self.prior_boxes = self.build_net(self.net_type, self.priors_type)
         self.priors_cfg = self.prior_boxes.get_prior_cfg()
         self.priors = self.prior_boxes.priors.to(self.device)
@@ -266,8 +259,6 @@ if __name__ == '__main__':
     priors_type = args.priors_type
     prob_threshold = args.prob_threshold
     iou_threshold = args.iou_threshold
-    top_k = args.top_k
-    keep_top_k = args.keep_top_k
     image_dir = args.image_dir
     device = args.device
     input_size = args.input_size
@@ -277,8 +268,6 @@ if __name__ == '__main__':
                    priors_type=priors_type,
                    prob_threshold=prob_threshold,
                    iou_threshold=iou_threshold,
-                   top_k=top_k,
-                   keep_top_k=keep_top_k,
                    input_size=input_size,
                    device=device)
     det.detect_image_dir(image_dir, isshow=True)

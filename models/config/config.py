@@ -93,3 +93,22 @@ face_person_config = {
     'decay2': 220,
     "class_names": ['BACKGROUND', 'face', 'person'],
 }
+
+card_config = {
+    "image_mean_test": np.array([127, 127, 127]),
+    "image_mean": np.array([127, 127, 127]),
+    "image_std": 128.0,
+    'min_sizes': [[16], [32, 48], [64, 96], [128, 192, 256]],
+    "shrinkage": [8, 16, 32, 64],
+    # "aspect_ratios": [[1.0, 1.0]],
+    "aspect_ratios": [[1.0, 1.0], [1.2, 1.5], [1.0, 2.0], [1.5, 1.2], [2.0, 1.0]],
+    "iou_threshold": 0.3,
+    "center_variance": 0.1,
+    "size_variance": 0.2,
+    'clip': False,
+    'loc_weight': 2.0,
+    'landm_weight': 1.0,
+    'decay1': 190,
+    'decay2': 220,
+    "class_names": {'BACKGROUND': 0, 'card': 1, '1': 1}
+}

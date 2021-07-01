@@ -61,6 +61,7 @@ class TrainTransform:
             # augment_bbox.RandomContrastBrightness(),
             # augment_bbox.ResizePadding(self.size),
             # augment_bbox.ResizeRandomPadding(self.size, p=1.0),
+            # augment_bbox.RandomMosaic(size, p=0.5),
             augment_bbox.Resize(size),
             augment_bbox.RandomColorJitter(),
             augment_bbox.SwapChannels(),
@@ -89,6 +90,7 @@ class TestTransform:
             augment_bbox.Resize(size),
             # augment_bbox.ResizePadding(size),
             augment_bbox.NormalizeBoxesCoords(),
+            augment_bbox.ProtectBoxes(norm=True),
             augment_bbox.Normalize(mean=mean, std=std, norm=norm),
             ToTensor(),
         ])

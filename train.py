@@ -16,7 +16,7 @@ import torch.utils.data as data
 from models.dataloader.parser_voc_landmark import VOCLandmarkDataset
 from models.dataloader.parser_voc import VOCDataset
 # from models.dataloader.parser_voc_landmark_preproc import VOCLandmarkDataset
-from models.transforms.data_transforms import TrainTransform
+from models.transforms.data_transforms import TrainTransform, TestTransform
 from models.dataloader import WiderFaceDetection, detection_collate
 from models.backbone.multibox_loss import MultiBoxLoss
 from models.anchor_utils.prior_box import PriorBox
@@ -36,14 +36,10 @@ def get_parser():
     # net_type = "rfb"
     net_type = "RFB"
 
-    # train_path1 = "/home/dm/panjinquan3/MPII/trainval.txt"
-    # val_path = "/home/dm/panjinquan3/MPII/test.txt"
-    # train_path = "/home/dm/panjinquan3/wider_face_add_lm_10_10/trainval.txt"
-    # val_path = "/home/dm/panjinquan3/wider_face_add_lm_10_10/test.txt"
-    train_path = "/home/dm/data3/dataset/face_person/MPII/test.txt"
-    val_path = "/home/dm/data3/dataset/face_person/MPII/test.txt"
+    train_path = "/home/dm/data3/dataset/card_datasets/yolo_det/CardData4det/val.txt"
+    val_path = "/home/dm/data3/dataset/card_datasets/yolo_det/CardData4det/val.txt"
     data_type = "VOC"
-    priors_type = "mnet_face_config"
+    priors_type = "card"
     batch_size = 8
     train_path = [train_path]
     val_path = [val_path]
@@ -200,7 +196,7 @@ class Trainer(object):
         # train_transform = preproc(self.input_size, self.rgb_mean, self.rgb_std)
         # test_transform = val_preproc(self.input_size, self.rgb_mean, self.rgb_std)
         train_transform = TrainTransform(self.input_size, self.rgb_mean, self.rgb_std)
-        test_transform = TrainTransform(self.input_size, self.rgb_mean, self.rgb_std)
+        test_transform = TestTransform(self.input_size, self.rgb_mean, self.rgb_std)
         train_dataset = self.load_dataset(train_path, data_type, train_transform, phase="train", check=True)
         train_loader = data.DataLoader(train_dataset, self.batch_size, shuffle=True,
                                        num_workers=self.num_workers, collate_fn=detection_collate)

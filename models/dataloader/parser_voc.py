@@ -216,6 +216,7 @@ class VOCDataset(Dataset):
         """
         image_id = self.index2id(index)
         image_file, annotation_file = self.get_image_anno_file(image_id)
+        # print(image_file)
         bboxes, labels, is_difficult = self.get_annotation(annotation_file)
         image = self.read_image(image_file, color_space=self.color_space)
         if not self.keep_difficult:
@@ -524,9 +525,8 @@ def show_boxes_image(image, bboxes, labels, normal=False, transpose=False):
     if normal:
         bboxes = bboxes * bboxes_scale
     # tmp_image = image_processing.untranspose(tmp_image)
-    tmp_image = image_processing.convert_color_space(image, colorSpace="BGR")
-    tmp_image = image_processing.draw_image_bboxes_text(tmp_image, bboxes, labels)
-    image_processing.cv_show_image("image", tmp_image, waitKey=0)
+    image = image_processing.draw_image_bboxes_text(image, bboxes, labels)
+    image_processing.cv_show_image("image", image, waitKey=0)
     print("===" * 10)
 
 
@@ -545,15 +545,16 @@ if __name__ == "__main__":
     # data_root = "/home/dm/panjinquan3/dataset/finger/finger_v5/"
     # data_root = '/home/dm/panjinquan3/dataset/Character/gimage_v1/'
     # data_root = "/home/dm/data3/dataset/face_person/SMTC/"
-    data_root = "/home/dm/data3/dataset/face_person/MPII/"
+    # data_root = "/home/dm/data3/dataset/face_person/MPII/"
     # data_root = "/home/dm/data3/dataset/face_person/COCO/VOC/"
-    # data_root = "/home/dm/data3/dataset/card_datasets/yolo_det/CardData4det/"
+    data_root = "/home/dm/data3/dataset/card_datasets/yolo_det/CardData4det/"
     image_dir = data_root + "JPEGImages"
     anno_dir = data_root + "Annotations"
     filenames = data_root + "trainval.txt"
     # class_names = ["face", "person"]
-    class_names = ["person"]
-    # class_names = ["card","1"]
+    # class_names = ["person"]
+    class_names = ["card","1"]
+    # class_names = ["1"]
     # anno_dir = data_root + '/Annotations'
     shuffle = False
     # class_names = ["face", "person"]
@@ -561,17 +562,18 @@ if __name__ == "__main__":
     # class_names = {"circle": 0, "hook": 1, "slash": 2, "underline": 3}
     # anno_list = file_processing.get_files_list(anno_dir, postfix=["*.xml"])
     # image_id_list = file_processing.get_files_id(anno_list)
-    size = [320, 320]
+    size = [480, 480]
     # transform = data_transforms.TrainAugmentation(size, mean=0.0, std=1.0)
     # transform = data_transforms.TrainTransform(size, mean=0.0, std=1.0, norm=True)
-    transform = data_transforms.DemoTransform(size, mean=0.0, std=1.0, norm=True)
+    # transform = data_transforms.DemoTransform(size, mean=0.0, std=1.0, norm=True)
+    transform = data_transforms.TrainTransform(size, mean=0.0, std=1.0, norm=True)
     voc = VOCDataset(filename=filenames,
                      data_root=None,
                      anno_dir=anno_dir,
                      image_dir=image_dir,
                      class_names=class_names,
                      transform=transform,
-                     check=False)
+                     check=True)
     voc = ConcatDataset([voc, voc])
     # voc = torch_utils.ConcatDataset([voc, voc])
     print("have num:{}".format(len(voc)))

@@ -20,6 +20,8 @@ class PriorBox(object):
             cfg = config.mnet_face_config
         elif priors_type == "slim_face":
             cfg = config.slim_face_config
+        elif priors_type == "card":
+            cfg = config.card_config
         else:
             raise Exception("Error:{}".format(priors_type))
 
@@ -161,7 +163,7 @@ if __name__ == "__main__":
 
     # 17625,29375
     input_size = [320, 320]  # W,H
-    priors_type = "face_person"
+    priors_type = "card"
     prior_boxes = PriorBox(input_size, priors_type=priors_type)
     image = np.ones(shape=(input_size[1], input_size[0], 3), dtype=np.uint8)
     anchors = prior_boxes.priors.detach().numpy()

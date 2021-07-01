@@ -29,10 +29,10 @@ def get_parser():
     net_type = "rfb_landm"
     priors_type = "face"
 
-    image_dir = "data/test_image"
-    model_path = "/home/dm/data3/FaceDetector/torch-Slim-Detection-Landmark/data/weights/v0.0/mobilenet0.25_Final.pth"
-    net_type = "mnet_landm"
-    priors_type = "mnet_face"
+    # image_dir = "data/test_image"
+    # model_path = "/home/dm/data3/FaceDetector/torch-Slim-Detection-Landmark/data/weights/v0.0/mobilenet0.25_Final.pth"
+    # net_type = "mnet_landm"
+    # priors_type = "mnet_face"
     parser = argparse.ArgumentParser(description='Face Detection Test')
     parser.add_argument('-m', '--model_path', default=model_path, type=str, help='model file path')
     parser.add_argument('--net_type', default=net_type, help='Backbone network mobile0.25 or slim or RFB')
@@ -42,8 +42,6 @@ def get_parser():
     parser.add_argument('--image_dir', default=image_dir, type=str, help='directory or image path')
     parser.add_argument('--input_size', nargs='+', help="--input size [600(W),600(H)]", type=int, default=input_size)
     parser.add_argument('--num_classes', help="num_classes", type=int, default=2)
-    parser.add_argument('--top_k', default=5000, type=int, help='top_k')
-    parser.add_argument('--keep_top_k', default=750, type=int, help='keep_top_k')
     parser.add_argument('--device', default="cuda:0", type=str, help='device')
     args = parser.parse_args()
     print(args)
@@ -59,8 +57,6 @@ class Detector(demo.Detector):
                  prob_threshold=0.6,
                  iou_threshold=0.4,
                  freeze_header=False,
-                 top_k=5000,
-                 keep_top_k=750,
                  device="cpu"
                  ):
         super(Detector, self).__init__(model_path,
@@ -69,9 +65,10 @@ class Detector(demo.Detector):
                                        input_size=input_size,
                                        prob_threshold=prob_threshold,
                                        iou_threshold=iou_threshold,
-                                       freeze_header=freeze_header)
+                                       freeze_header=freeze_header,
+                                       device=device)
 
-    def build_net(self, net_type, priors_type, version="v1"):
+    def build_net(self, net_type, priors_type, version="v2"):
         return super().build_net(net_type, priors_type, version)
 
     @debug.run_time_decorator("post_process")
@@ -190,8 +187,6 @@ if __name__ == '__main__':
     priors_type = args.priors_type
     prob_threshold = args.prob_threshold
     iou_threshold = args.iou_threshold
-    top_k = args.top_k
-    keep_top_k = args.keep_top_k
     image_dir = args.image_dir
     device = args.device
     input_size = args.input_size
@@ -201,8 +196,6 @@ if __name__ == '__main__':
                    priors_type=priors_type,
                    prob_threshold=prob_threshold,
                    iou_threshold=iou_threshold,
-                   top_k=top_k,
-                   keep_top_k=keep_top_k,
                    input_size=input_size,
                    device=device)
     det.detect_image_dir(image_dir, isshow=True)
