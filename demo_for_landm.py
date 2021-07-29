@@ -18,14 +18,14 @@ import argparse
 import numpy as np
 import demo
 from models.anchor_utils import anchor_utils
-from models.anchor_utils.nms.py_cpu_nms import py_cpu_nms
+from models.anchor_utils.nms import py_cpu_nms
 from utils import debug
 
 
 def get_parser():
     input_size = [320, 320]
     image_dir = "data/test_image"
-    model_path = "work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_dmai_data_FDDB_v2_ssd_20210624145405/model/best_model_RFB_landm_183_loss7.6508.pth"
+    model_path = "/home/dm/data3/FaceDetector/torch-Slim-Detection-Landmark/work_space/RFB_landms_v2/RFB_landm1.0_face_320_320_wider_face_add_lm_10_10_dmai_data_FDDB_v2_ssd_20210624145405/model/best_model_RFB_landm_183_loss7.6508.pth"
     net_type = "rfb_landm"
     priors_type = "face"
 
@@ -71,96 +71,36 @@ class Detector(demo.Detector):
     def build_net(self, net_type, priors_type, version="v2"):
         return super().build_net(net_type, priors_type, version)
 
-    @debug.run_time_decorator("post_process")
     def pose_process(self, output, image_size):
         """
-        :param loc:
-        :param conf:
-        :param width: orig image width
-        :param height:orig image height
-        :param top_k: keep top_k results. If k <= 0, keep all the results.
-        :param prob_threshold:
-        :param iou_threshold:
-        :return:
+        bboxes, conf, landms = output
+        bboxes = torch.Size([1, num_anchors, 4])
+        bboxes = torch.Size([1, num_anchors, 2])
+        bboxes = torch.Size([1, num_anchors, 10])
         """
-        boxes, conf, landms = output
+        bboxes, scores, landms = output
         bboxes_scale = np.asarray(image_size * 2)
         landms_scale = np.asarray(image_size * 5)
         if not self.prior_boxes.freeze_header:
             # get boxes
-            boxes = anchor_utils.decode(boxes.data.squeeze(0), self.priors,
-                                        [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
+            variances = [self.prior_boxes.center_variance, self.prior_boxes.size_variance]
+            bboxes = anchor_utils.decode(bboxes, self.priors, variances)
             # get landmarks
-            # landms = box_utils.decode_landm(landms.data.squeeze(0), self.priorbox, variance)
-            landms = anchor_utils.decode_landm(landms.data.squeeze(0), self.priors,
-                                               [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
+            landms = anchor_utils.decode_landm(landms, self.priors, variances)
 
-        boxes = boxes.cpu().numpy()
-        conf = conf.squeeze(0).data.cpu().numpy()
-        boxes = boxes * bboxes_scale
-        landms = landms.squeeze(0)
-        landms = landms.cpu().numpy()
+        bboxes = bboxes[0].cpu().numpy()
+        scores = scores[0].cpu().numpy()
+        landms = landms[0].cpu().numpy()
+        bboxes = bboxes * bboxes_scale
         landms = landms * landms_scale
-
-        picked_box_probs = []
-        picked_landms = []
-        picked_labels = []
-        num_classes = conf.shape[1]
-        for class_index in range(1, num_classes):
-            sub_probs = conf[:, class_index]
-            if sub_probs.shape[0] == 0:
-                continue
-            dets, landm = self.nms_process(boxes,
-                                           sub_probs,
-                                           landms,
-                                           prob_threshold=self.prob_threshold,
-                                           iou_threshold=self.iou_threshold,
-                                           top_k=self.top_k,
-                                           keep_top_k=self.keep_top_k)
-            picked_box_probs.append(dets)
-            picked_landms.append(landm)
-            picked_labels.extend([class_index] * dets.shape[0])
-        if len(picked_box_probs) == 0:
-            return np.asarray([]), np.asarray([]), np.asarray([])
-        dets = np.concatenate(picked_box_probs)
-        landms = np.concatenate(picked_landms)
-        labels = np.asarray(picked_labels)
+        scores = scores[:, 1:]  # scores[:, 0:]是背景，无需nms
+        dets, labels, landms = py_cpu_nms.bboxes_landm_nms(bboxes, scores, landms,
+                                                           prob_threshold=self.prob_threshold,
+                                                           iou_threshold=self.iou_threshold,
+                                                           top_k=self.top_k,
+                                                           keep_top_k=self.keep_top_k)
+        labels = labels + 1  # index+1
         return dets, labels, landms
-
-    @staticmethod
-    @debug.run_time_decorator("nms_process")
-    def nms_process(boxes, scores, landms, prob_threshold, iou_threshold, top_k, keep_top_k):
-        """
-        :param boxes: (num_boxes, 4)
-        :param scores:(num_boxes,)
-        :param landms:(num_boxes, 10)
-        :param prob_threshold:
-        :param iou_threshold:
-        :param top_k:
-        :param keep_top_k:
-        :return: dets:shape=(num_bboxes,5),[xmin,ymin,xmax,ymax,scores]
-                 landms:(num_bboxes,10),[x0,y0,x1,y1,...,x4,y4]
-        """
-        # ignore low scores
-        inds = np.where(scores > prob_threshold)[0]
-        boxes = boxes[inds]
-        landms = landms[inds]
-        scores = scores[inds]
-        # keep top-K before NMS
-        order = scores.argsort()[::-1][:top_k]
-        boxes = boxes[order]
-        landms = landms[order]
-        scores = scores[order]
-        # do NMS
-        dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
-        keep = py_cpu_nms(dets, iou_threshold)
-        # keep = nms(dets, args.nms_threshold,force_cpu=args.cpu)
-        dets = dets[keep, :]
-        landms = landms[keep]
-        # keep top-K faster NMS
-        dets = dets[:keep_top_k, :]
-        landms = landms[:keep_top_k, :]
-        return dets, landms
 
     @debug.run_time_decorator("predict")
     def predict(self, rgb_image, isshow=False):

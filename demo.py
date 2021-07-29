@@ -21,15 +21,19 @@ import numpy as np
 from models import nets
 from models.anchor_utils.prior_box import PriorBox
 from models.anchor_utils import anchor_utils
-from models.anchor_utils.nms.py_cpu_nms import py_cpu_nms
+from models.anchor_utils.nms import py_cpu_nms
 from utils import image_processing, file_processing, torch_tools
 
 
 def get_parser():
     input_size = [320, 320]
+    image_dir = "/home/dm/data3/dataset/card_datasets/card_test/card"
+    model_path = "work_space/card/RFB1.0_card_320_320_CardData4det_20210701114842/model/best_model_RFB_199_loss0.4026.pth"
+    net_type = "rfb"
+    priors_type = "card"
+
     image_dir = "data/test_image"
-    model_path = "work_space/best_model_RFB_063_loss3.0318.pth"
-    # model_path ="work_space/rfb_ldmks_face_320_320.pth"
+    model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v2_ssd_20210624100518/model/best_model_RFB_168_loss2.8330.pth"
     net_type = "rfb"
     priors_type = "face_person"
 
@@ -57,7 +61,7 @@ class Detector(object):
                  prob_threshold=0.6,
                  iou_threshold=0.4,
                  freeze_header=True,
-                 device="cpu"):
+                 device="cuda:0"):
         """
         :param model_path:
         :param net_type:"RFB",
@@ -72,24 +76,26 @@ class Detector(object):
         self.priors_type = priors_type
         self.prob_threshold = prob_threshold
         self.iou_threshold = iou_threshold
+        self.model_path = model_path
         self.top_k = 5000
         self.keep_top_k = 750
         self.input_size = input_size
         self.freeze_header = freeze_header
-        self.net, self.prior_boxes = self.build_net(self.net_type, self.priors_type)
+        self.model, self.prior_boxes = self.build_net(self.net_type, self.priors_type)
+        self.class_names = self.prior_boxes.class_names
         self.priors_cfg = self.prior_boxes.get_prior_cfg()
         self.priors = self.prior_boxes.priors.to(self.device)
-        self.net = self.load_model(self.net, model_path)
+        self.model = self.load_model(self.model, model_path)
         print('Finished loading model!')
 
     def build_net(self, net_type, priors_type, version="v2"):
         priorbox = PriorBox(input_size=self.input_size, priors_type=priors_type, freeze_header=self.freeze_header)
         if version.lower() == "v1".lower():
-            net = nets.build_net_v1(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+            model = nets.build_net_v1(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
         else:
-            net = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
-        net = net.to(self.device)
-        return net, priorbox
+            model = nets.build_net_v2(net_type, priorbox, width_mult=1.0, phase='test', device=self.device)
+        model = model.to(self.device)
+        return model, priorbox
 
     def load_model(self, model, model_path):
         """
@@ -121,87 +127,34 @@ class Detector(object):
         image_tensor = torch.from_numpy(out_image).unsqueeze(0)
         return image_tensor
 
-    # @debug.run_time_decorator("post_process")
     def pose_process(self, output, image_size):
         """
-        :param loc:
-        :param conf:
-        :param width: orig image width
-        :param height:orig image height
-        :param top_k: keep top_k results. If k <= 0, keep all the results.
-        :param prob_threshold:
-        :param iou_threshold:
-        :return:
+        bboxes, scores = output
         """
-        boxes, conf = output
+        bboxes, scores = output
         bboxes_scale = np.asarray(image_size * 2)
         # get boxes
         if not self.prior_boxes.freeze_header:
-            boxes = anchor_utils.decode(boxes.data.squeeze(0), self.priors,
-                                        [self.prior_boxes.center_variance, self.prior_boxes.size_variance])
-        boxes = boxes.cpu().numpy()
-        conf = conf.squeeze(0).data.cpu().numpy()
-        boxes = boxes * bboxes_scale
-
-        picked_box_probs = []
-        picked_labels = []
-        num_classes = conf.shape[1]
-        for class_index in range(1, num_classes):
-            sub_probs = conf[:, class_index]
-            if sub_probs.shape[0] == 0:
-                continue
-            dets = self.nms_process(boxes, sub_probs,
-                                    prob_threshold=self.prob_threshold,
-                                    iou_threshold=self.iou_threshold,
-                                    top_k=self.top_k,
-                                    keep_top_k=self.keep_top_k)
-            picked_box_probs.append(dets)
-            # picked_labels.extend([class_index] * dets.shape[0])
-            picked_labels += [class_index] * dets.shape[0]
-
-        if len(picked_box_probs) == 0:
-            return np.asarray([]), np.asarray([]), np.asarray([])
-        dets = np.concatenate(picked_box_probs)
-        labels = np.asarray(picked_labels)
+            variances = [self.prior_boxes.center_variance, self.prior_boxes.size_variance]
+            bboxes = anchor_utils.decode(bboxes, self.priors, variances)
+        bboxes = bboxes[0].cpu().numpy()
+        scores = scores[0].cpu().numpy()
+        bboxes = bboxes * bboxes_scale
+        scores = scores[:, 1:]  # scores[:, 0:]是背景，无需nms
+        dets, labels = py_cpu_nms.bboxes_nms(bboxes, scores,
+                                             prob_threshold=self.prob_threshold,
+                                             iou_threshold=self.iou_threshold,
+                                             top_k=self.top_k,
+                                             keep_top_k=self.keep_top_k)
+        labels = labels + 1  # index+1
         return dets, labels
-
-    @staticmethod
-    # @debug.run_time_decorator("nms_process")
-    def nms_process(boxes, scores, prob_threshold, iou_threshold, top_k, keep_top_k):
-        """
-        :param boxes: (num_boxes, 4)
-        :param scores:(num_boxes,)
-        :param landms:(num_boxes, 10)
-        :param prob_threshold:
-        :param iou_threshold:
-        :param top_k:
-        :param keep_top_k:
-        :return: dets:shape=(num_bboxes,5),[xmin,ymin,xmax,ymax,scores]
-                 landms:(num_bboxes,10),[x0,y0,x1,y1,...,x4,y4]
-        """
-        # ignore low scores
-        inds = np.where(scores > prob_threshold)[0]
-        boxes = boxes[inds]
-        scores = scores[inds]
-        # keep top-K before NMS
-        order = scores.argsort()[::-1][:top_k]
-        boxes = boxes[order]
-        scores = scores[order]
-        # do NMS
-        dets = np.hstack((boxes, scores[:, np.newaxis])).astype(np.float32, copy=False)
-        keep = py_cpu_nms(dets, iou_threshold)
-        # keep = nms(dets, args.nms_threshold,force_cpu=args.cpu)
-        dets = dets[keep, :]
-        # keep top-K faster NMS
-        dets = dets[:keep_top_k, :]
-        return dets
 
     # @debug.run_time_decorator("inference")
     def inference(self, input_tensor):
         with torch.no_grad():
             input_tensor = input_tensor.to(self.device)
             # loc, conf, landms-> boxes,scores,landms
-            output = self.net(input_tensor)
+            output = self.model(input_tensor)
         return output
 
     # @debug.run_time_decorator("predict")
@@ -231,7 +184,7 @@ class Detector(object):
         for img_path in image_list:
             image = cv2.imread(img_path)
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            image = image_processing.resize_image(image, 800)
+            # image = image_processing.resize_image(image, 800)
             self.predict(image, isshow=isshow)
 
     def show_image(self, image, dets, labels, landms=None):
@@ -240,15 +193,15 @@ class Detector(object):
         :param dets
         :return:
         """
-        bboxes = dets[:, 0:4]
-        scores = dets[:, 4:5]
         if not landms is None and len(landms) > 0:
             landms = landms.reshape(len(landms), -1, 2)
             image = image_processing.draw_landmark(image, landms, vis_id=False)
-        print("bboxes:{}".format(bboxes))
-        print("scores:{}".format(scores))
+        print("dets:{}".format(dets))
         print("landms:{}".format(landms))
-        image = image_processing.draw_image_detection_bboxes(image, bboxes, scores, labels)
+        if len(dets) > 0:
+            bboxes = dets[:, 0:4]
+            scores = dets[:, 4:5]
+            image = image_processing.draw_image_detection_bboxes(image, bboxes, scores, labels)
         image_processing.cv_show_image("image", image)
 
 

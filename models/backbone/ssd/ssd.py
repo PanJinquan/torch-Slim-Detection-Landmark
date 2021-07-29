@@ -77,8 +77,7 @@ class SSD(nn.Module):
         if self.is_test:
             confidences = F.softmax(confidences, dim=2)
             if self.freeze_header:
-                locations = anchor_utils.decode(locations.data.squeeze(0), self.priors,
-                                                [self.center_variance, self.size_variance])
+                locations = anchor_utils.decode(locations, self.priors,[self.center_variance, self.size_variance])
         return locations, confidences
 
 

@@ -200,7 +200,7 @@ def plot_map_recall_precision(map_result: dict):
     """
     import matplotlib
     import matplotlib.pyplot as plt
-    # matplotlib.use('TkAgg')
+    matplotlib.use('TkAgg')
     class_name = list(map_result.keys())
 
     # Precision-Recall

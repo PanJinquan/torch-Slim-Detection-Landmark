@@ -83,7 +83,7 @@ class VOCDataset:
         :return:
         """
         dst_image_idx = []
-        # image_idx = image_idx[:20]
+        image_idx = image_idx[:20]
         print("checking images,please wait a minute")
         for image_id in tqdm(image_idx):
             image_file, annotation_file = self.get_image_anno_file(self.image_dir, self.anno_dir, image_id,

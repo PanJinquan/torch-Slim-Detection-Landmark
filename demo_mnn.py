@@ -90,9 +90,9 @@ class MNNDetector(demo.Detector):
     @debug.run_time_decorator("inference")
     def inference(self, img_tensor):
         img_tensor = np.asarray(img_tensor, dtype=np.float32)
-        session = self.net["session"]
-        interpreter = self.net["interpreter"]
-        input_tensor = self.net["input_tensor"]
+        session = self.model["session"]
+        interpreter = self.model["interpreter"]
+        input_tensor = self.model["input_tensor"]
         mnn_tensor = MNN.Tensor((1, 3, self.input_size[1], self.input_size[0]),
                                 MNN.Halide_Type_Float, img_tensor,
                                 MNN.Tensor_DimensionType_Caffe)

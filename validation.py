@@ -1,6 +1,7 @@
 # -*-coding: utf-8 -*-
 """
-    @Project: torch-Slim-Detection-Landmark
+    @Project: Pytorch-SSD
+    @File   : ssd_detector.py
     @Author : panjq
     @E-mail : pan_jinquan@163.com
     @Date   : 2019-11-11 14:55:55
@@ -15,46 +16,36 @@ import demo
 import demo_for_landm
 from tqdm import tqdm
 from utils import file_processing, image_processing
-from utils.validation import eval_dataset, measurements
-from models.dataloader.parser_voc import VOCDataset
+from utils.validation import measurements, bboxes_match, parser_voc
 
 
 class Validation(demo.Detector):
     # class Validation(demo_for_landm.Detector):
     def __init__(self,
                  model_path,
-                 net_type,
-                 input_size,
-                 class_names,
-                 priors_type,
-                 prob_threshold=0.01,
-                 iou_threshold=0.5,
-                 device="cuda:0"):
-        '''
-
-        :param model_path:
-        :param basenet:
-        :param class_names:
-        :param gt_dir: ground_truth dir lable_file.txt is
-                label1 x y w h\n
-                lable2 x y w h
-        '''
-        self.model_path = model_path
-        self.net_type = net_type
-        self.input_size = input_size
-        self.priors_type = priors_type
-        self.class_names = class_names
-        self.candidate_size = 500
-        self.iou_threshold = iou_threshold
-        self.prob_threshold = prob_threshold
-        self.device = device
+                 net_type="RFB",
+                 priors_type="face",
+                 input_size=[320, 320],
+                 prob_threshold=0.6,
+                 iou_threshold=0.4,
+                 freeze_header=False,
+                 device="cpu"
+                 ):
         super(Validation, self).__init__(model_path,
-                                         self.net_type,
-                                         self.priors_type,
-                                         self.input_size,
-                                         prob_threshold=self.prob_threshold,
-                                         iou_threshold=self.iou_threshold,
-                                         device=self.device)
+                                         net_type=net_type,
+                                         priors_type=priors_type,
+                                         input_size=input_size,
+                                         prob_threshold=prob_threshold,
+                                         iou_threshold=iou_threshold,
+                                         freeze_header=freeze_header,
+                                         device=device)
+
+    def detect_image(self, rgb_image, isshow=False):
+        dets, labels = self.predict(rgb_image, isshow=isshow)
+        if len(dets) == 0:
+            return np.asarray([]), np.asarray([]), np.asarray([])
+        boxes, probs = dets[:, 0:4], dets[:, 4:5]
+        return boxes, labels, probs
 
     def get_ground_truth(self, filename, label_dir=None):
         """
@@ -95,7 +86,7 @@ class Validation(demo.Detector):
                 continue
             orig_image = cv2.imread(image_path)
             rgb_image = cv2.cvtColor(orig_image, cv2.COLOR_BGR2RGB)
-            boxes, labels, probs = self.predict(rgb_image, isshow=False)
+            boxes, labels, probs = self.detect_image(rgb_image, isshow=False)
             label_names = file_processing.decode_label(labels, name_table=self.class_names)
             info = image_processing.combile_label_prob(label_names, probs)
             dt_filename = file_processing.create_dir(save_dir, "dt_result", filename=filename)
@@ -159,7 +150,7 @@ class Validation(demo.Detector):
             image_path = os.path.join(image_dir, filename[:-len("txt")] + "jpg")
             print(image_path)
             image = image_processing.read_image(image_path)
-            bboxes, classes, scores = self.predict(image, isshow=isshow)
+            bboxes, classes, scores = self.detect_image(image, isshow=isshow)
             dt_path = os.path.join(dt_label_dir, filename)
             self.save_detect_result(image, dt_path, bboxes, scores, classes, isshow=isshow)
 
@@ -191,7 +182,6 @@ class Validation(demo.Detector):
         :param dt_results:  (num_bboxes, 7)=[indexes,labels,probs,boxes]
         :return:
         """
-        from utils.validation import bboxes_match
         if not save_dir:
             save_dir = os.path.join(dataset.data_root, "gt_dt_result")
             file_processing.create_dir(save_dir)
@@ -200,7 +190,7 @@ class Validation(demo.Detector):
             image_id, annotation = dataset.get_annotation(i)
             gt_boxes, classes, is_difficult = annotation
             rgb_image = dataset.get_image(i)
-            dt_boxes, labels, probs = self.predict(rgb_image, isshow=False)
+            dt_boxes, labels, probs = self.detect_image(rgb_image, isshow=False)
             pred_bboxes, true_bboxes = bboxes_match.MatchingBBoxes.bboxes_matching(dt_boxes, gt_boxes)
             # 如果IOU匹配后，bboxes的个数不一致，则说明出现漏检或者误检测
             if show and len(pred_bboxes) < len(dt_boxes):
@@ -236,12 +226,10 @@ class Validation(demo.Detector):
         :param dataroot: VOC Dataset Root
         :return:
         """
-        # test_file = os.path.join(dataroot, "test.txt")
         eval_results = os.path.join(dataroot, "eval_results")
-        dataset = eval_dataset.VOCDataset(dataroot,
-                                          test_file=test_file,
-                                          colorSpace="RGB",
-                                          class_names=self.class_names)
+        dataset = parser_voc.VOCDataset(filename=test_file,
+                                        class_names=self.class_names,
+                                        check=True)
         assert self.class_names == dataset.class_names
         # self.num_true_cases, self.all_gb_boxes, self.all_difficult_cases = self.get_gt_result(dataset)
         # self.save_dt_gt_result(dataset)
@@ -264,10 +252,19 @@ class Validation(demo.Detector):
         """
         results = []
         for i in tqdm(range(len(dataset))):
-            image = dataset.get_image(i)
-            dets, labels = self.predict(image, isshow=False)
-            boxes = dets[:, 0:4]
-            probs = dets[:, 4:5]
+            # image = dataset.get_image(i)
+            image_id = dataset.index2id(i)
+            image_file, annotation_file = dataset.get_image_anno_file(image_id)
+            image = dataset.read_image(image_file, color_space=dataset.color_space)
+            boxes, labels, probs = self.detect_image(image, isshow=False)
+            if len(boxes) == 0:
+                print(image_file)
+                continue
+            # boxes, labels, probs,_ = self.detect_image(image, isshow=False)
+            # face_index = labels == self.class_names.index("face")
+            # boxes = boxes[face_index, :]
+            # labels = labels[face_index]
+            # probs = probs[face_index]
             indexes = np.ones(labels.shape[0], dtype=np.float32) * i
             results.append(np.concatenate([indexes.reshape(-1, 1),
                                            labels.reshape(-1, 1),
@@ -292,7 +289,7 @@ class Validation(demo.Detector):
                 sub = dt_results[dt_results[:, 1] == class_index, :]
                 for i in range(sub.shape[0]):
                     prob_box = sub[i, 2:]
-                    image_id = dataset.ids[int(sub[i, 0])]
+                    image_id = dataset.image_id[int(sub[i, 0])]
                     print(image_id + " " + " ".join([str(v) for v in prob_box]), file=f)
 
     def calculate_map(self, gt_results, class_names, eval_results="eval_results"):
@@ -321,7 +318,7 @@ class Validation(demo.Detector):
             results[class_name] = result
             ap = result["ap"]
             aps.append(ap)
-            ap_log = "{}: {:3.5f}".format(class_name, ap)
+            ap_log = " {}: {:3.5f}".format(class_name, ap)
             ap_logs += ap_log
             print(ap_log)
         print("\nAverage Precision Across All Classes: mAP:{:3.5f}".format(sum(aps) / len(aps)))
@@ -338,8 +335,11 @@ class Validation(demo.Detector):
         all_gt_boxes = {}
         all_difficult_cases = {}
         for i in range(len(dataset)):
-            image_id, annotation = dataset.get_annotation(i)
-            gt_boxes, classes, is_difficult = annotation
+            image_id = dataset.index2id(i)
+            image_file, annotation_file = dataset.get_image_anno_file(image_id)
+            # print(image_file)
+            gt_boxes, classes, is_difficult = dataset.get_annotation(annotation_file)
+
             # gt_boxes = torch.from_numpy(gt_boxes)
             for i, difficult in enumerate(is_difficult):
                 class_index = int(classes[i])
@@ -377,31 +377,31 @@ def validation_report():
     best:model_path="pretrained/RFB_person_640_360_MPII_VOC2012_VOC2007_VOC_20200624105257/model/RFB-Epoch-197-Loss-1.8028894911951094.pth"
     :return:
     '''
-    prob_threshold = 0.05
-    iou_threshold = 0.5
-    model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v3_20210616195058/model/best_model_RFB_157_loss2.8114.pth"
-    # priors_type = "face"
-    priors_type = "face_person"
-    net_type = "RFB"
-    # net_type = "RFB_landms"
-    # net_type = "mbv2"
-    class_names = ["BACKGROUND", "face", "person"]
-    # class_names = ["BACKGROUND", "face"]
     input_size = [320, 320]
-    dataroot = "/home/dm/data3/dataset/face_person/MPII"
+    # model_path = "work_space/RFB_face_person/RFB1.0_face_person_320_320_MPII_v2_ssd_20210624100518/model/best_model_RFB_168_loss2.8330.pth"
+    # net_type = "rfb"
+    # priors_type = "face_person"
+    # dataroot = "/home/dm/data3/dataset/face_person/MPII"
+
+    priors_type = "card"
+    net_type = "RFB"
+    # net_type = "mbv2"
     # dataroot = "/data3/panjinquan/dataset/face_person/MPII"
+    dataroot = "/home/dm/data3/dataset/card_datasets/yolo_det/CardData4det/"
+    model_path = "work_space/card/RFB1.0_card_320_320_CardData4det_20210701114842/model/best_model_RFB_199_loss0.4026.pth"
+
     image_dir = os.path.join(dataroot, "JPEGImages")
-    filename = os.path.join(dataroot, "test.txt")
+    filename = os.path.join(dataroot, "val.txt")
     save_dir = os.path.join(dataroot, "eval")
     label_dir = os.path.join(dataroot, "labels")
+
     det = Validation(model_path,
                      net_type=net_type,
-                     input_size=input_size,
-                     class_names=class_names,
                      priors_type=priors_type,
-                     iou_threshold=iou_threshold,
                      prob_threshold=prob_threshold,
-                     device=device)
+                     iou_threshold=iou_threshold,
+                     input_size=input_size,
+                     device=args.device)
     det.metrics_for_voc(dataroot, filename)
     # det.metrics_for_text(image_dir,
     #                      filename,
@@ -414,6 +414,13 @@ def validation_report():
 
 
 if __name__ == "__main__":
+    """
+    person: 0.89907
+    Average Precision Across All Classes: mAP:0.86085
+    MPII: face: 0.82263person: 0.89907 mAP:0.86085
+    ========================================
+    """
     args = demo.get_parser()
-    device = args.device
+    prob_threshold = 0.05
+    iou_threshold = 0.5
     validation_report()

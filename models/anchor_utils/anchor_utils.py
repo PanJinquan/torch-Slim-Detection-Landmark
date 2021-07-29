@@ -153,7 +153,6 @@ def match_landms(threshold, truths, priors, variances, labels, landms, loc_t, co
     landm_t[idx] = landm
 
 
-
 def match(threshold, truths, priors, variances, labels, loc_t, conf_t, idx):
     """Match each prior box with the ground truth box of the highest jaccard
     overlap, encode the bounding boxes, then return the matched indices
@@ -264,11 +263,11 @@ def encode_landm(matched, priors, variances):
 
 
 # Adapted from https://github.com/Hakuyume/chainer-ssd
-def decode(loc, priors, variances):
+def decode_bug(locations, priors, variances):
     """Decode locations from predictions using priors to undo
     the encoding we did for offset regression at train time.
     Args:
-        loc (tensor): location predictions for loc layers,
+        locations (tensor): location predictions for loc layers,
             Shape: [num_priors,4]
         priors (tensor): Prior boxes in center-offset form.
             Shape: [num_priors,4].
@@ -276,16 +275,67 @@ def decode(loc, priors, variances):
     Return:
         decoded bounding box predictions
     """
-
+    locations = locations.data.squeeze(0)
     boxes = torch.cat((
-        priors[:, :2] + loc[:, :2] * variances[0] * priors[:, 2:],
-        priors[:, 2:] * torch.exp(loc[:, 2:] * variances[1])), 1)
+        priors[:, :2] + locations[:, :2] * variances[0] * priors[:, 2:],
+        priors[:, 2:] * torch.exp(locations[:, 2:] * variances[1])), 1)
     boxes[:, :2] -= boxes[:, 2:] / 2
     boxes[:, 2:] += boxes[:, :2]
     return boxes
 
 
+def decode(locations, priors, variances):
+    """Decode locations from predictions using priors to undo
+    the encoding we did for offset regression at train time.
+    Args:
+        locations (tensor): location predictions for loc layers,
+            Shape: [num_priors,4]
+        priors (tensor): Prior boxes in center-offset form.
+            Shape: [num_priors,4].
+        variances: (list[float]) Variances of priorboxes 'variance': [0.1, 0.2],
+    Return:
+        decoded bounding box predictions
+    """
+    # 参考Ultra-Light-Fast-Generic-Face-Detector-->1MB-convert_locations_to_boxes
+    # priors can have one dimension less.
+    if priors.dim() + 1 == locations.dim():
+        priors = priors.unsqueeze(0)
+    # convert_locations_to_boxes
+    boxes = torch.cat([
+        priors[..., :2] + locations[..., :2] * variances[0] * priors[..., 2:],
+        priors[..., 2:] * torch.exp(locations[..., 2:] * variances[1])
+    ], dim=locations.dim() - 1)
+
+    # center_form_to_corner_form
+    boxes = torch.cat([boxes[..., :2] - boxes[..., 2:] / 2,
+                       boxes[..., :2] + boxes[..., 2:] / 2], boxes.dim() - 1)
+    return boxes
+
+
 def decode_landm(pre, priors, variances):
+    """Decode landm from predictions using priors to undo
+    the encoding we did for offset regression at train time.
+    Args:
+        pre (tensor): landm predictions for loc layers,
+            Shape: [num_priors,10]
+        priors (tensor): Prior boxes in center-offset form.
+            Shape: [num_priors,4].
+        variances: (list[float]) Variances of priorboxes
+    Return:
+        decoded landm predictions
+    """
+    if priors.dim() + 1 == pre.dim():
+        priors = priors.unsqueeze(0)
+    landms = torch.cat((priors[..., :2] + pre[..., :2] * variances[0] * priors[..., 2:],
+                        priors[..., :2] + pre[..., 2:4] * variances[0] * priors[..., 2:],
+                        priors[..., :2] + pre[..., 4:6] * variances[0] * priors[..., 2:],
+                        priors[..., :2] + pre[..., 6:8] * variances[0] * priors[..., 2:],
+                        priors[..., :2] + pre[..., 8:10] * variances[0] * priors[..., 2:],
+                        ), dim=pre.dim() - 1)
+    return landms
+
+
+def decode_landm_bk(pre, priors, variances):
     """Decode landm from predictions using priors to undo
     the encoding we did for offset regression at train time.
     Args:

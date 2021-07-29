@@ -9,7 +9,7 @@
 """
 
 import numpy as np
-from utils import iou
+from utils.validation import iou
 
 
 class MatchingBBoxes(object):
